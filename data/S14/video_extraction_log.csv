@@ -1,0 +1,13 @@
+Trial,BagFile,Topic,VideoFile,NumFrames,FPS
+T01,trial_2025-05-13-13-18-16.bag,/left/decklink/ECM/image_raw/compressed,T01_left.mp4,6073,59.9392667507757
+T01,trial_2025-05-13-13-18-16.bag,/right/decklink/ECM/image_raw/compressed,T01_right.mp4,6075,59.9403252548984
+T02,trial_2025-05-13-13-20-31.bag,/left/decklink/ECM/image_raw/compressed,T02_left.mp4,5932,59.9406918627287
+T02,trial_2025-05-13-13-20-31.bag,/right/decklink/ECM/image_raw/compressed,T02_right.mp4,5930,59.9289317038861
+T03,trial_2025-05-13-13-22-39.bag,/left/decklink/ECM/image_raw/compressed,T03_left.mp4,5800,59.9450132081021
+T03,trial_2025-05-13-13-22-39.bag,/right/decklink/ECM/image_raw/compressed,T03_right.mp4,5798,59.9408728259416
+T04,trial_2025-05-13-13-24-41.bag,/left/decklink/ECM/image_raw/compressed,T04_left.mp4,5451,59.9413096402441
+T04,trial_2025-05-13-13-24-41.bag,/right/decklink/ECM/image_raw/compressed,T04_right.mp4,5449,59.9412541315056
+T05,trial_2025-05-13-13-26-38.bag,/left/decklink/ECM/image_raw/compressed,T05_left.mp4,6080,59.9543673087745
+T05,trial_2025-05-13-13-26-38.bag,/right/decklink/ECM/image_raw/compressed,T05_right.mp4,6077,59.9234055934121
+T06,trial_2025-05-13-13-28-45.bag,/left/decklink/ECM/image_raw/compressed,T06_left.mp4,5434,59.9304260296724
+T06,trial_2025-05-13-13-28-45.bag,/right/decklink/ECM/image_raw/compressed,T06_right.mp4,5426,59.946324957489
