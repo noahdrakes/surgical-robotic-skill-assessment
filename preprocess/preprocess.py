@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import argparse
 import shutil
+from tqdm import tqdm
+
 
 
 def find_subject_files(path_to_data):
@@ -18,13 +20,15 @@ def convert_time_to_sec_float(secs, nsecs):
 
 def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
+    
+
     # all rostopics 
     rostopics_header = []
 
     # Creating directory called data preprocessed in the top level of the repo
     path_to_write_data_ = os.path.join(path_to_write_data, "data_preprocessed")
 
-    print("is this the error")
+    # print("is this the error")
     if os.path.exists(path_to_write_data_):
         # os.rmdir(path_to_write_data_)
         # remove dir and all of its contents
@@ -36,15 +40,24 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
     # grabbing all of the subject dir
     subject_dirs = find_subject_files(path_to_data)
 
+    print("Preprocessing in Progress...")
+
     # iterating through each subject
     for subject_dir in subject_dirs:
+
+        # Progress Bar for Preprocess
+        pbar = tqdm(desc="Subject " + subject_dir)
 
         # loading all trial dir with parquet files
         path_to_parquet_files = os.path.join(path_to_data, subject_dir, "parquet")
         trial_dirs = [d for d in os.listdir(path_to_parquet_files) if not d.startswith('.')]
 
+        pbar.total = len(trial_dirs)
+
         # iterating through each trial per subject
         for trial_count, trial_dir in enumerate(trial_dirs):
+
+            
 
             new_df = pd.DataFrame()
             # iterating through each chosen rostopic to store to preprocessed ata folder
@@ -101,6 +114,8 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
             trial_path = os.path.join(path_to_write_data_, subject_dir, trial_dir + ".csv")
             new_df.to_csv(trial_path, index=False, header=False)
+
+            pbar.update()
         
         rostopics_header_path = os.path.join(path_to_write_data_, subject_dir, "rostopics_header.txt")
         with open(rostopics_header_path, "w") as f:
@@ -126,7 +141,8 @@ def main():
 
     # These are the chosen rostopics that we want to preprocess for data collection 
     # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right" ,"consolecamera", "SUJPSM3measured_js", "forcen_left", "MTMR1measured_cp"]
-    CHOSEN_ROS_TOPICS = ["accel_left", "accel_right", "forcen_left"]
+    # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right", "forcen_left"]
+    CHOSEN_ROS_TOPICS = ["accel_left", "accel_right"]
 
     preprocess_data(path_to_data=args.path_to_data,     
                     chosen_ros_topics=CHOSEN_ROS_TOPICS,
@@ -134,7 +150,7 @@ def main():
     
 
 
-# Using the special variable 
+
 # __name__
 if __name__=="__main__":
     main()
