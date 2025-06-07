@@ -20,8 +20,6 @@ def convert_time_to_sec_float(secs, nsecs):
 
 def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
-    
-
     # all rostopics 
     rostopics_header = []
 
@@ -57,9 +55,7 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
         # iterating through each trial per subject
         for trial_count, trial_dir in enumerate(trial_dirs):
 
-            
-
-            new_df = pd.DataFrame()
+            columns_to_add = {} 
             # iterating through each chosen rostopic to store to preprocessed ata folder
             for rostopic_count, rostopic in enumerate(chosen_ros_topics):
 
@@ -97,7 +93,7 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
                     rostopics_header_ = rostopic + "_" + column_name
 
-                    new_df[rostopics_header_] = column_data # adding rostopic name to each header
+                    columns_to_add[rostopics_header_] = column_data # adding rostopic name to each header
 
                     if trial_count == 0:
                         if rostopics_header_ not in rostopics_header:
@@ -107,7 +103,8 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
                 # print(rostopic)
                 # pd.set_option('display.max_columns', None)
                 # print(df.head())
-            
+            # Add all columns to new_df at once
+            new_df = pd.DataFrame(columns_to_add)
 
             subject_dir_ = os.path.join(path_to_write_data_, subject_dir)
             os.makedirs(subject_dir_, exist_ok=True)
@@ -142,7 +139,57 @@ def main():
     # These are the chosen rostopics that we want to preprocess for data collection 
     # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right" ,"consolecamera", "SUJPSM3measured_js", "forcen_left", "MTMR1measured_cp"]
     # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right", "forcen_left"]
-    CHOSEN_ROS_TOPICS = ["accel_left", "accel_right"]
+    # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right"]
+
+    CHOSEN_ROS_TOPICS = [
+    "accel_left",
+    "accel_right",
+    "ATImini40",
+    "consolecamera",
+    "consolefollow_mode",
+    "consolehead_in",
+    "consolehead_out",
+    "consoleoperator_present",
+    "ECM1bodymeasured_cv",
+    "ECM1measured_cp",
+    "ECM1measured_js",
+    "forcen_left",
+    "forcen_right",
+    "MTML1bodymeasured_cv",
+    "MTML1follow_mode",
+    "MTML1grippermeasured_js",
+    "MTML1measured_cp",
+    "MTML1measured_js",
+    "MTML1select",
+    "MTMR1bodymeasured_cv",
+    "MTMR1follow_mode",
+    "MTMR1grippermeasured_js",
+    "MTMR1measured_cp",
+    "MTMR1measured_js",
+    "MTMR1select",
+    "PSM1bodymeasured_cv",
+    "PSM1follow_mode",
+    "PSM1jawmeasured_js",
+    "PSM1measured_cp",
+    "PSM1measured_js",
+    "PSM2bodymeasured_cv",
+    "PSM2follow_mode",
+    "PSM2jawmeasured_js",
+    "PSM2measured_cp",
+    "PSM2measured_js",
+    "PSM3bodymeasured_cv",
+    "PSM3jawmeasured_js",
+    "PSM3measured_cp",
+    "PSM3measured_js",
+    "SUJECM1measured_cp",
+    "SUJECM1measured_js",
+    "SUJPSM1measured_cp",
+    "SUJPSM1measured_js",
+    "SUJPSM2measured_cp",
+    "SUJPSM2measured_js",
+    "SUJPSM3measured_cp",
+    "SUJPSM3measured_js"
+]
 
     preprocess_data(path_to_data=args.path_to_data,     
                     chosen_ros_topics=CHOSEN_ROS_TOPICS,
