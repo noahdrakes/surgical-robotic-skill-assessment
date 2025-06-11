@@ -1,0 +1,40 @@
+{
+    "completion_time": {
+        "ros_topic": "timestamp",
+        "timestamp_axis": "timestamp"
+    },
+    "average_speed_magnitude": {
+        "PSM1": {
+            "ros_topic": "PSM1measured_cp",
+            "axes": ["PSM1measured_cp_pos_x", "PSM1measured_cp_pos_y", "PSM1measured_cp_pos_z"]
+        },
+        "PSM2": {
+            "ros_topic": "PSM2measured_cp",
+            "axes": ["PSM2measured_cp_pos_x", "PSM2measured_cp_pos_y", "PSM2measured_cp_pos_z"]
+        }
+    },
+    "average_acceleration_magnitude": {
+        "PSM1": {
+            "ros_topic": "PSM1measured_cp",
+            "velocity_axes": ["PSM1measured_cp_x", "PSM1measured_cp_y", "PSM1measured_cp_z"],
+            "accel_axes": ["PSM1measured_accel_x", "PSM1measured_accel_y", "PSM1measured_accel_z"],
+            "timestamp_axis": "timestamp",
+            "using_accel": false
+        },
+        "PSM2": {
+            "ros_topic": "PSM2measured_cp",
+            "velocity_axes": ["PSM2measured_cp_x", "PSM2measured_cp_y", "PSM2measured_cp_z"],
+            "accel_axes": ["PSM2measured_accel_x", "PSM2measured_accel_y", "PSM2measured_accel_z"],
+            "timestamp_axis": "timestamp",
+            "using_accel": false
+        },
+        "PSM3": {
+            "ros_topic": "PSM3measured_cp",
+            "velocity_axes": ["PSM3measured_cp_x", "PSM3measured_cp_y", "PSM3measured_cp_z"],
+            "accel_axes": ["PSM3measured_accel_x", "PSM3measured_accel_y", "PSM3measured_accel_z"],
+            "timestamp_axis": "timestamp",
+            "using_accel": true
+        }
+    },
+    "compute_metric_for_subject": "def compute_metric_for_subject(self, subject_name, metric_name, header_path):\n    if subject_name not in self.subjects:\n        raise ValueError(f\"No trials found for subject: {subject_name}\")\n\n    metrics = self.subjects[subject_name][\"metrics\"]\n    trial_paths = self.subjects[subject_name][\"trial_paths\"]\n\n    results = []\n    for trial_path in trial_paths:\n        trial_data_frame = self.load_trial_data(trial_path, header_path)\n\n        # Check if the metric has sub-configurations (e.g., PSM-specific entries)\n        if isinstance(self.metric_config[metric_name], dict) and \"ros_topic\" in self.metric_config[metric_name]:\n            # Single configuration (e.g., completion_time)\n            config = self.metric_config[metric_name]\n            metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)\n            results.append({\"Trial\": trial_path, \"Result\": metric_result})\n        else:\n            # Multiple sub-configurations (e.g., average_speed_magnitude for PSMs)\n            trial_results = {}\n            for psm, config in self.metric_config[metric_name].items():\n                trial_results[psm] = metrics.compute_metric(metric_name, trial_data_frame, config)\n            results.append(trial_results)\n\n    return results"
+}

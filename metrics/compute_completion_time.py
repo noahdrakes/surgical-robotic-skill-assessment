@@ -7,8 +7,6 @@ from tqdm import tqdm
 from pprint import pprint
 from Metrics import Metrics, MetricsManager
 
-
-
 def find_subject_files(path_to_data):
     return [f for f in os.listdir(path_to_data) if not f.startswith('.')]
 
@@ -46,14 +44,21 @@ def add_all_subjects(manager, path_to_data):
             pbar.update()
 
 ## printing completion time
-manager = MetricsManager()
+manager = MetricsManager(config_path="metric_config.json")
 
-path_to_data = "/Volumes/drakes_ssd_500gb/skill_assessment/data_preprocessed/"
+print("adding all subjects")
+path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed"
 add_all_subjects(manager, path_to_data)
 
-metric_names = ["completion_time"]
-output_path = path_to_data + "completion_time_metrics.csv"
-manager.export_metrics_to_csv(metric_names=metric_names, output_csv_path=output_path)
+print("subjects added")
+
+header_path = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed/S01/rostopics_header.txt"
+output_csv_path = "results.csv"
+
+print("exporting to csv")
+metric_names = ["completion_time","average_speed_magnitude"]
+manager.export_metrics_to_csv(metric_names, output_csv_path, header_path)
+print("finished")
 
 # print("Completion Time Results: ", completion_time_results)
 
