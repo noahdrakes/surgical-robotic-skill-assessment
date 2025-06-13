@@ -1,6 +1,10 @@
 {
     "completion_time": {
-        "timestamp_axis": "timestamp"
+        "timestamp_axis": "timestamp",
+        "ATImini40": {
+            "fields": ["ATImini40_force_x", "ATImini40_force_y", "ATImini40_force_z"]
+        },
+        "use_force_sensor": true
     },
     "average_speed_magnitude": {
         "PSM1measured_cp": {

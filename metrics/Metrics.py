@@ -11,8 +11,23 @@ class Metrics:
 
     def compute_completion_time(self, trial_data, config):
         timestamps = trial_data[config["timestamp_axis"]]
-        return float(timestamps.iloc[-1] - timestamps.iloc[0])
 
+        if config["use_force_sensor"] == False:
+            return float(timestamps.iloc[-1] - timestamps.iloc[0])
+        if config["use_force_sensor"] == True:
+            force_z_field = config["ATImini40"]["fields"][2]  ## 2 is hardcoded for the z axis
+            force_z_data = trial_data[force_z_field] 
+
+        force_threshold_count = 0
+        
+
+        for i in range(len(force_z_data)):
+            if (force_z_data[i] < -2):
+                force_threshold_count += 1
+                print(force_threshold_count)
+
+        while(1):
+            i =0
     def compute_average_speed_magnitude(self, trial_data, rostopic_config):
         speed_magnitude = 0
         for field in rostopic_config["fields"]:

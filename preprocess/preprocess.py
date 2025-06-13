@@ -20,8 +20,6 @@ def convert_time_to_sec_float(secs, nsecs):
 
 def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
-    
-
     # all rostopics 
     rostopics_header = []
 
@@ -56,8 +54,6 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
         # iterating through each trial per subject
         for trial_count, trial_dir in enumerate(trial_dirs):
-
-            
 
             new_df = pd.DataFrame()
             # iterating through each chosen rostopic to store to preprocessed ata folder
@@ -142,7 +138,7 @@ def main():
     # These are the chosen rostopics that we want to preprocess for data collection 
     # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right" ,"consolecamera", "SUJPSM3measured_js", "forcen_left", "MTMR1measured_cp"]
     # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right", "forcen_left"]
-    CHOSEN_ROS_TOPICS = ["PSM1measured_cp", "PSM2measured_cp"]
+    CHOSEN_ROS_TOPICS = ["PSM1measured_cp", "PSM2measured_cp", "ATImini40"]
 
 #     CHOSEN_ROS_TOPICS = [
 #     "accel_left",
