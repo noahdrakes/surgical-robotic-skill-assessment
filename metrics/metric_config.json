@@ -1,39 +1,27 @@
 {
     "completion_time": {
-        "ros_topic": "timestamp",
         "timestamp_axis": "timestamp"
     },
     "average_speed_magnitude": {
-        "PSM1": {
-            "ros_topic": "PSM1measured_cp",
-            "axes": ["PSM1measured_cp_pos_x", "PSM1measured_cp_pos_y", "PSM1measured_cp_pos_z"]
+        "PSM1measured_cp": {
+            "fields": ["PSM1measured_cp_pos_x", "PSM1measured_cp_pos_y", "PSM1measured_cp_pos_z"]
         },
-        "PSM2": {
-            "ros_topic": "PSM2measured_cp",
-            "axes": ["PSM2measured_cp_pos_x", "PSM2measured_cp_pos_y", "PSM2measured_cp_pos_z"]
+        "PSM2measured_cp": {
+            "fields": ["PSM2measured_cp_pos_x", "PSM2measured_cp_pos_y", "PSM2measured_cp_pos_z"]
         }
     },
     "average_acceleration_magnitude": {
-        "PSM1": {
-            "ros_topic": "PSM1measured_cp",
-            "velocity_axes": ["PSM1measured_cp_x", "PSM1measured_cp_y", "PSM1measured_cp_z"],
-            "accel_axes": ["PSM1measured_accel_x", "PSM1measured_accel_y", "PSM1measured_accel_z"],
+        "PSM1measured_cp": {
+            "velocity_fields": ["PSM1measured_cp_x", "PSM1measured_cp_y", "PSM1measured_cp_z"],
+            "acceleration_fields": ["PSM1measured_accel_x", "PSM1measured_accel_y", "PSM1measured_accel_z"],
             "timestamp_axis": "timestamp",
             "using_accel": false
         },
-        "PSM2": {
-            "ros_topic": "PSM2measured_cp",
-            "velocity_axes": ["PSM2measured_cp_x", "PSM2measured_cp_y", "PSM2measured_cp_z"],
-            "accel_axes": ["PSM2measured_accel_x", "PSM2measured_accel_y", "PSM2measured_accel_z"],
+        "PSM2measured_cp": {
+            "velocity_fields": ["PSM2measured_cp_x", "PSM2measured_cp_y", "PSM2measured_cp_z"],
+            "acceleration_fields": ["PSM2measured_accel_x", "PSM2measured_accel_y", "PSM2measured_accel_z"],
             "timestamp_axis": "timestamp",
             "using_accel": false
-        },
-        "PSM3": {
-            "ros_topic": "PSM3measured_cp",
-            "velocity_axes": ["PSM3measured_cp_x", "PSM3measured_cp_y", "PSM3measured_cp_z"],
-            "accel_axes": ["PSM3measured_accel_x", "PSM3measured_accel_y", "PSM3measured_accel_z"],
-            "timestamp_axis": "timestamp",
-            "using_accel": true
         }
     }
 }

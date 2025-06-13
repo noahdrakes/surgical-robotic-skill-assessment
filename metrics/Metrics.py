@@ -5,43 +5,34 @@ import json
 import pandas as pd
 
 class Metrics:
-
     def __init__(self, subject, num_trials):
-        self.name = subject  # Instance attribute
-        self.num_trials = num_trials 
-
-        # Dictionary to map metric names to methods
-        self.metric_functions = {
-            "completion_time": self.compute_completion_time,
-            "average_speed_magnitude": self.compute_average_speed_magnitude,
-            "average_acceleration_magnitude": self.compute_average_acceleration_magnitude
-        }
+        self.name = subject
+        self.num_trials = num_trials
 
     def compute_completion_time(self, trial_data, config):
-        # print(config["timestamp_axis"])
         timestamps = trial_data[config["timestamp_axis"]]
         return float(timestamps.iloc[-1] - timestamps.iloc[0])
 
-    def compute_average_speed_magnitude(self, trial_data, config):
+    def compute_average_speed_magnitude(self, trial_data, rostopic_config):
         speed_magnitude = 0
-        for axis in config["axes"]:
-            speed_avg = trial_data[axis].mean()
+        for field in rostopic_config["fields"]:
+            speed_avg = trial_data[field].mean()
             speed_magnitude += pow(speed_avg, 2)
         return float(math.sqrt(speed_magnitude))
 
-    def compute_average_acceleration_magnitude(self, trial_data, config):
+    def compute_average_acceleration_magnitude(self, trial_data, rostopic_config):
         accel_sqrd = 0
-        timestamps = trial_data[config["timestamp_axis"]]
+        timestamps = trial_data[rostopic_config["timestamp_axis"]]
         dt = np.diff(timestamps)
 
-        if not config["using_accel"]:
-            for axis in config["velocity_axes"]:
-                velocity = trial_data[axis]
+        if not rostopic_config["using_accel"]:
+            for field in rostopic_config["velocity_fields"]:
+                velocity = trial_data[field]
                 acceleration = np.diff(velocity) / dt
                 accel_sqrd += pow(acceleration.mean(), 2)
         else:
-            for axis in config["accel_axes"]:
-                acceleration = trial_data[axis]
+            for field in rostopic_config["acceleration_fields"]:
+                acceleration = trial_data[field]
                 accel_sqrd += pow(acceleration.mean(), 2)
 
         return float(math.sqrt(accel_sqrd))
@@ -50,18 +41,22 @@ class Metrics:
         if metric_name == "completion_time":
             return self.compute_completion_time(trial_data, config)
         elif metric_name == "average_speed_magnitude":
-            return self.compute_average_speed_magnitude(trial_data, config)
+            results = {}
+            for rostopic, rostopic_config in config.items():
+                results[rostopic] = self.compute_average_speed_magnitude(trial_data, rostopic_config)
+            return results
         elif metric_name == "average_acceleration_magnitude":
-            return self.compute_average_acceleration_magnitude(trial_data, config)
+            results = {}
+            for rostopic, rostopic_config in config.items():
+                results[rostopic] = self.compute_average_acceleration_magnitude(trial_data, rostopic_config)
+            return results
         else:
             raise ValueError(f"Metric '{metric_name}' is not supported.")
 
 
 class MetricsManager:
     def __init__(self, config_path):
-        self.subjects = {}  # Dictionary to store trials for each subject
-
-        # Load configuration from JSON file
+        self.subjects = {}
         with open(config_path, "r") as f:
             self.metric_config = json.load(f)
 
@@ -75,36 +70,10 @@ class MetricsManager:
         self.subjects[subject_name]["trial_paths"].append(trial_path)
 
     def load_trial_data(self, trial_path, header_path):
-        """
-        Load preprocessed trial data based on the file format (CSV or Parquet).
-
-        Args:
-            trial_path (str): Path to the trial's data file.
-            header_path (str): Path to the rostopics header file.
-
-        Returns:
-            pd.DataFrame: DataFrame containing the trial data with proper column names.
-        """
-        import os
-
-        # Determine file extension
-        file_extension = os.path.splitext(trial_path)[1].lower()
-
-        # Load header
         with open(header_path, "r") as f:
             header = f.readline().strip().split(",")
-
-        # Load trial data based on file type
-        if file_extension == ".csv":
-            trial_data = pd.read_csv(trial_path, header=None)
-        elif file_extension == ".parquet":
-            trial_data = pd.read_parquet(trial_path, engine="pyarrow")
-        else:
-            raise ValueError(f"Unsupported file format: {file_extension}")
-
-        # Assign header to columns
+        trial_data = pd.read_csv(trial_path, header=None)
         trial_data.columns = header
-
         return trial_data
 
     def compute_metric_for_subject(self, subject_name, metric_name, header_path):
@@ -117,19 +86,9 @@ class MetricsManager:
         results = []
         for trial_path in trial_paths:
             trial_data_frame = self.load_trial_data(trial_path, header_path)
-
-            # Check if the metric has sub-configurations (e.g., PSM-specific entries)
-            if isinstance(self.metric_config[metric_name], dict) and "ros_topic" in self.metric_config[metric_name]:
-                # Single configuration (e.g., completion_time)
-                config = self.metric_config[metric_name]
-                metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-                results.append({"Trial": trial_path, "Result": metric_result})
-            else:
-                # Multiple sub-configurations (e.g., average_speed_magnitude for PSMs)
-                trial_results = {}
-                for psm, config in self.metric_config[metric_name].items():
-                    trial_results[psm] = metrics.compute_metric(metric_name, trial_data_frame, config)
-                results.append(trial_results)
+            config = self.metric_config[metric_name]
+            metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
+            results.append({"Trial": trial_path, "Result": metric_result})
 
         return results
 
@@ -143,7 +102,7 @@ class MetricsManager:
             header_path (str): Path to the rostopics header file.
         """
         csv_data = []
-        header = ["Subject", "Trial", "PSM", "Metric", "Value"]  # Updated header
+        header = ["Subject", "Trial", "Metric", "Rostopic", "Value"]
 
         for subject_name, subject_data in self.subjects.items():
             trial_paths = subject_data["trial_paths"]
@@ -153,23 +112,21 @@ class MetricsManager:
                 trial_data_frame = self.load_trial_data(trial_path, header_path)
 
                 for metric_name in metric_names:
-                    # Check if the metric has sub-configurations
-                    if isinstance(self.metric_config[metric_name], dict) and "ros_topic" in self.metric_config[metric_name]:
-                        # Single configuration (e.g., completion_time)
-                        config = self.metric_config[metric_name]
-                        metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-                        row = [subject_name, f"Trial {trial_idx + 1}", "N/A", metric_name, metric_result]
+                    config = self.metric_config[metric_name]
+                    metric_results = metrics.compute_metric(metric_name, trial_data_frame, config)
+
+                    # Handle single-value metrics (e.g., completion_time)
+                    if isinstance(metric_results, float):
+                        row = [subject_name, f"Trial {trial_idx + 1}", metric_name, "N/A", metric_results]
                         csv_data.append(row)
-                    elif isinstance(self.metric_config[metric_name], dict):
-                        # Multiple sub-configurations (e.g., average_speed_magnitude for PSMs)
-                        for psm, config in self.metric_config[metric_name].items():
-                            metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-                            row = [subject_name, f"Trial {trial_idx + 1}", psm, metric_name, metric_result]
+                    # Handle multi-value metrics (e.g., average_speed_magnitude)
+                    elif isinstance(metric_results, dict):
+                        for rostopic, value in metric_results.items():
+                            row = [subject_name, f"Trial {trial_idx + 1}", metric_name, rostopic, value]
                             csv_data.append(row)
                     else:
-                        raise ValueError(f"Unsupported metric configuration for '{metric_name}'.")
+                        raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_results)}")
 
-        # Write to CSV
         df = pd.DataFrame(csv_data, columns=header)
         df.to_csv(output_csv_path, index=False)
 
