@@ -18,16 +18,58 @@ class Metrics:
             force_z_field = config["ATImini40"]["fields"][2]  ## 2 is hardcoded for the z axis
             force_z_data = trial_data[force_z_field] 
 
-        force_threshold_count = 0
-        
+            force_threshold_count = 0
+            
+            # for i in range(len(force_z_data)):
+            #     if (force_z_data[i] < -2):
+            #         force_threshold_count += 1
+            #         print(force_threshold_count)
 
-        for i in range(len(force_z_data)):
-            if (force_z_data[i] < -2):
-                force_threshold_count += 1
-                print(force_threshold_count)
+            force_z_magnitude = 0
+            len_force_z_data = len(force_z_data)
+            print(len_force_z_data)
+            count = 0
 
-        while(1):
-            i =0
+            while (count <= len_force_z_data):
+                # print("here")
+                force_z_magnitude = force_z_data[count]
+
+                count+=1
+
+                if force_z_magnitude < -2 :
+                    print("mag: ", force_z_magnitude)
+                    break
+                
+                
+
+            index_of_first_button_press = count
+
+            ## first button press timestamp
+            first_button_press_timestamp = timestamps[index_of_first_button_press]
+
+            # checking the last button press within 20 seconds of the first button press
+            end_range = first_button_press_timestamp + 20
+
+            print("made it")
+            last_button_press_idx = 0
+
+            print("index of first button press: ", index_of_first_button_press)
+            print("first press timestamp: ", timestamps[index_of_first_button_press])
+
+            for i in range(index_of_first_button_press, len_force_z_data):
+
+                force_z_magnitude = force_z_data[i]
+
+                if force_z_magnitude < -2:
+                    last_button_press_idx = i
+
+                if timestamps[i] > end_range:
+                    break
+            
+            print("timestamp of last button press: ", timestamps[last_button_press_idx])
+
+            while(1):
+                i =0
     def compute_average_speed_magnitude(self, trial_data, rostopic_config):
         speed_magnitude = 0
         for field in rostopic_config["fields"]:
@@ -126,6 +168,8 @@ class MetricsManager:
             for trial_idx, trial_path in enumerate(trial_paths):
                 trial_data_frame = self.load_trial_data(trial_path, header_path)
 
+                print(subject_name)
+                print(trial_path)
                 for metric_name in metric_names:
                     config = self.metric_config[metric_name]
                     metric_results = metrics.compute_metric(metric_name, trial_data_frame, config)
@@ -160,6 +204,7 @@ class MetricsManager:
         header = ["Subject", "Trial", "PSM"] + metric_names  # CSV header with all metrics
 
         for subject_name, subject_data in self.subjects.items():
+            print(subject_name)
             trial_paths = subject_data["trial_paths"]
             metrics = subject_data["metrics"]
 
@@ -169,6 +214,7 @@ class MetricsManager:
                 # Check if the metric has sub-configurations
                 row = [subject_name, f"Trial {trial_idx + 1}"]  # Initialize row with subject and trial info
 
+                print(trial_path)
                 for metric_name in metric_names:
                     if isinstance(self.metric_config[metric_name], dict) and "ros_topic" in self.metric_config[metric_name]:
                         # Single configuration (e.g., completion_time)

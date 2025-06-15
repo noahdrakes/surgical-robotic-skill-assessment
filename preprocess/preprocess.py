@@ -3,6 +3,8 @@ import os
 import argparse
 import shutil
 from tqdm import tqdm
+from list_sample_rate_freq import calculate_sample_rate
+from downsample_freq import downsample_ros_data
 
 
 
@@ -16,7 +18,7 @@ def convert_time_to_sec_float(secs, nsecs):
         sec_float.append( secs[i] + (nsecs[i] / 1e9))
     
     return sec_float
-        
+
 
 def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
 
@@ -62,6 +64,8 @@ def preprocess_data(path_to_data, chosen_ros_topics, path_to_write_data):
                 # load parquet file for rostopic into memory
                 parquet_file_path = os.path.join(path_to_parquet_files, trial_dir, rostopic + ".parquet")
                 df = pd.read_parquet(parquet_file_path, "pyarrow")
+
+                df = downsample_ros_data(df, target_frequency = "40.00ms")
 
                 float_sec = []
 

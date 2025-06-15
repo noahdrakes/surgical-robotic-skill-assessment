@@ -3,6 +3,7 @@ import os
 import argparse
 import shutil
 from tqdm import tqdm
+import numpy as np
 
 
 
@@ -16,44 +17,37 @@ def convert_time_to_sec_float(secs, nsecs):
         sec_float.append( secs[i] + (nsecs[i] / 1e9))
     
     return sec_float
-        
 
-def list_elements(path_to_data, chosen_ros_topics):
+def calculate_sample_rate(timestamps):
+    timestamps_ = np.array(timestamps)
+    return 1 / np.diff(timestamps_).mean(0)
+    
 
+def preprocess_data(trial_dir, chosen_ros_topics):
 
-    print("Preprocessing in Progress...")
-
+    new_df = pd.DataFrame()
     # iterating through each chosen rostopic to store to preprocessed ata folder
     for rostopic_count, rostopic in enumerate(chosen_ros_topics):
 
         # load parquet file for rostopic into memory
-        parquet_file_path = os.path.join(path_to_data, rostopic + ".parquet")
+        parquet_file_path = os.path.join(trial_dir, rostopic + ".parquet")
         df = pd.read_parquet(parquet_file_path, "pyarrow")
 
-        shape = []
+        float_sec = []
 
-        if rostopic_count == 0:
-            shape = df.shape
+        # we are grabbing the timestamp from the first rostopic 
+        sec_column = df['header_stamp_sec']
+        nsec_column = df['header_stamp_nsec']
+        float_sec = convert_time_to_sec_float(sec_column, nsec_column)
+
+        sample_rate = calculate_sample_rate(float_sec)
         
+        print("ROSTOPIC: ", rostopic, " | sample_rate: ", sample_rate, "Hz ")
 
-        print("")
-        print("ROSTOPIC: ", rostopic, " shape: ", df.shape)
-        print("sub elements")
-        print("____________")
 
-        # HARDCODED start and end idx -> may need to change depending on if the parquet data format changes
-        parquet_start_idx = 4
-        parquet_end_index = len(df.columns) - 1 # this is the column before the bag name
 
-        # iterated through each element in the rostopic 
-        for i in range(parquet_start_idx, parquet_end_index):
+                
 
-            column_name = df.columns[i]
-            print(column_name)
-
-            # delete angular accel accleration
-            if "angular_accel" in column_name:
-                continue
 
 def main():
     print("Starting data preprocessing")
@@ -63,18 +57,24 @@ def main():
                     description='Processes mistic dataset for surgical robotic skill assessment',
                     epilog='Text at the bottom of help')
     
-    parser.add_argument('path_to_data', help='path to the first trial with all of the parquet files')           # positional argument
+    parser.add_argument('path_to_data')           # positional argument
 
     args = parser.parse_args()
     
+
+    # These are the chosen rostopics that we want to preprocess for data collection 
+    # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right" ,"consolecamera", "SUJPSM3measured_js", "forcen_left", "MTMR1measured_cp"]
+    # CHOSEN_ROS_TOPICS = ["accel_left", "accel_right", "forcen_left"]
+    # CHOSEN_ROS_TOPICS = ["PSM1measured_cp", "PSM2measured_cp", "ATImini40"]
+
     CHOSEN_ROS_TOPICS = [
     "accel_left",
     "accel_right",
     "ATImini40",
     "consolecamera",
     "consolefollow_mode",
-    "consolehead_in",
-    "consolehead_out",
+    # "consolehead_in",
+    # "consolehead_out",
     "consoleoperator_present",
     "ECM1bodymeasured_cv",
     "ECM1measured_cp",
@@ -117,7 +117,8 @@ def main():
     "SUJPSM3measured_js"
 ]
 
-    list_elements(path_to_data=args.path_to_data, chosen_ros_topics=CHOSEN_ROS_TOPICS)
+    preprocess_data(trial_dir=args.path_to_data,     
+                    chosen_ros_topics=CHOSEN_ROS_TOPICS)
     
 
 
