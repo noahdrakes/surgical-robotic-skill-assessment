@@ -3,7 +3,7 @@ import pandas as pd
 
 def downsample_ros_data(df, target_frequency="20.833ms"):
     """
-    Downsamples a ROS DataFrame based on the header timestamp.
+    Downsamples a ROS DataFrame based on the header timestamp, handling empty values.
 
     Args:
         df (pd.DataFrame): The DataFrame containing ROS data with header fields.
@@ -23,8 +23,9 @@ def downsample_ros_data(df, target_frequency="20.833ms"):
     numeric_columns = df.select_dtypes(include=["number"]).columns
     downsampled_df = df[numeric_columns].resample(target_frequency).mean()
 
-    # Handle missing values (fill or interpolate)
-    downsampled_df = downsampled_df.interpolate(method="linear").ffill()
+    # Handle missing values
+    downsampled_df = downsampled_df.ffill()  # Forward fill missing values
+    downsampled_df = downsampled_df.bfill()  # Backward fill remaining gaps
 
     # Reset the index to return a DataFrame with the original structure
     downsampled_df.reset_index(inplace=True)

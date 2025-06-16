@@ -4,6 +4,8 @@ import csv
 import json
 import pandas as pd
 
+completion_time_count = 0
+
 class Metrics:
     def __init__(self, subject, num_trials):
         self.name = subject
@@ -14,34 +16,29 @@ class Metrics:
 
         if config["use_force_sensor"] == False:
             return float(timestamps.iloc[-1] - timestamps.iloc[0])
+        
+        ## CASE of when force sensor 
         if config["use_force_sensor"] == True:
+
             force_z_field = config["ATImini40"]["fields"][2]  ## 2 is hardcoded for the z axis
             force_z_data = trial_data[force_z_field] 
 
-            force_threshold_count = 0
-            
-            # for i in range(len(force_z_data)):
-            #     if (force_z_data[i] < -2):
-            #         force_threshold_count += 1
-            #         print(force_threshold_count)
-
             force_z_magnitude = 0
             len_force_z_data = len(force_z_data)
+
             print(len_force_z_data)
             count = 0
 
-            while (count <= len_force_z_data):
-                # print("here")
-                force_z_magnitude = force_z_data[count]
+            while (count >= len_force_z_data):
 
-                count+=1
+                force_z_magnitude = force_z_data[count]
 
                 if force_z_magnitude < -2 :
                     print("mag: ", force_z_magnitude)
                     break
-                
-                
 
+                count+=1
+    
             index_of_first_button_press = count
 
             ## first button press timestamp
@@ -50,7 +47,6 @@ class Metrics:
             # checking the last button press within 20 seconds of the first button press
             end_range = first_button_press_timestamp + 20
 
-            print("made it")
             last_button_press_idx = 0
 
             print("index of first button press: ", index_of_first_button_press)
@@ -68,8 +64,12 @@ class Metrics:
             
             print("timestamp of last button press: ", timestamps[last_button_press_idx])
 
-            while(1):
-                i =0
+            # if (completion_time_count > 2):
+            #     while(1):
+            #         i =0
+            
+            return float(timestamps.iloc[-1] - timestamps.iloc[last_button_press_idx])
+        
     def compute_average_speed_magnitude(self, trial_data, rostopic_config):
         speed_magnitude = 0
         for field in rostopic_config["fields"]:

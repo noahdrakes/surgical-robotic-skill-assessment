@@ -47,12 +47,12 @@ def add_all_subjects(manager, path_to_data):
 manager = MetricsManager(config_path="metric_config.json")
 
 print("adding all subjects")
-path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/preprocess/data_preprocessed"
+path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed"
 add_all_subjects(manager, path_to_data)
 
 print("subjects added")
 
-header_path = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/preprocess/data_preprocessed/S01/rostopics_header.txt"
+header_path = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed/S01/rostopics_header.txt"
 output_csv_path = "results.csv"
 
 print("exporting to csv")
