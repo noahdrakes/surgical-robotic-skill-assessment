@@ -47,6 +47,7 @@ def add_all_subjects(manager, path_to_data):
 manager = MetricsManager(config_path="metric_config.json")
 
 print("adding all subjects")
+
 path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed"
 add_all_subjects(manager, path_to_data)
 
@@ -56,9 +57,9 @@ header_path = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-ro
 output_csv_path = "results.csv"
 
 print("exporting to csv")
-metric_names = ["completion_time","average_speed_magnitude"]
+
+metric_names = ["completion_time"]
 manager.export_metrics_to_csv(metric_names, output_csv_path, header_path)
 print("finished")
 
-# print("Completion Time Results: ", completion_time_results)
 

@@ -56,6 +56,7 @@ def list_elements(path_to_data, chosen_ros_topics):
                 continue
 
 def main():
+    print("hello")
     print("Starting data preprocessing")
 
     parser = argparse.ArgumentParser(

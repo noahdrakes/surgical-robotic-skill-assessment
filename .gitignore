@@ -2,3 +2,4 @@
 .DS_Store
 data_preprocessed/
 data/
+preprocess/aligned_data/

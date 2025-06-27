@@ -29,12 +29,13 @@ class Metrics:
             print(len_force_z_data)
             count = 0
 
+            ### FIRST FORCE IMPULSE ## 
             while (count >= len_force_z_data):
 
                 force_z_magnitude = force_z_data[count]
 
                 if force_z_magnitude < -2 :
-                    print("mag: ", force_z_magnitude)
+                    # print("mag: ", force_z_magnitude)
                     break
 
                 count+=1
@@ -49,8 +50,8 @@ class Metrics:
 
             last_button_press_idx = 0
 
-            print("index of first button press: ", index_of_first_button_press)
-            print("first press timestamp: ", timestamps[index_of_first_button_press])
+            # print("index of first button press: ", index_of_first_button_press)
+            # print("first press timestamp: ", timestamps[index_of_first_button_press])
 
             for i in range(index_of_first_button_press, len_force_z_data):
 
@@ -62,12 +63,31 @@ class Metrics:
                 if timestamps[i] > end_range:
                     break
             
-            print("timestamp of last button press: ", timestamps[last_button_press_idx])
+            # print("timestamp of last button press: ", timestamps[last_button_press_idx])
 
             # if (completion_time_count > 2):
             #     while(1):
             #         i =0
             
+
+            count = len_force_z_data - 1
+            
+
+            ### LAST FORCE IMPULSE ###
+            while (count >= len_force_z_data - 2000):
+
+                force_z_magnitude = force_z_data[count]
+                low_magnitude_idx = count
+
+                if force_z_magnitude >= -.1 and force_z_magnitude <= .1 :
+                    # print("mag: ", force_z_magnitude)
+                    low_magnitude_idx = count
+                    break
+
+                count-=1
+            
+            print(low_magnitude_idx)
+
             return float(timestamps.iloc[-1] - timestamps.iloc[last_button_press_idx])
         
     def compute_average_speed_magnitude(self, trial_data, rostopic_config):
