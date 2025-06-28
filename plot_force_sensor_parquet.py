@@ -18,14 +18,22 @@ def plot_force_sensor_z_from_parquet(parquet_file):
     # Load the Parquet file
     df = pd.read_parquet(parquet_file, engine="pyarrow")
 
-    # Check if the Z-axis force field exists
-    if "force_z" not in df.columns:
-        print("Error: Z-axis force field ('ATImini40_force_z') not found in the Parquet file.")
+    # Combine seconds and nanoseconds for high-resolution timestamp
+    if 'header_stamp_nsec' in df.columns:
+        df['timestamp'] = df['header_stamp_sec'] + df['header_stamp_nsec'] / 1e9
+    else:
+        df['timestamp'] = df['header_stamp_sec']
+
+    # Find the Z-axis force column
+    force_cols = [c for c in df.columns if c.endswith('_force_z') or c == 'force_z']
+    if not force_cols:
+        print("Error: Z-axis force field not found in the Parquet file.")
         return
+    force_col = force_cols[0]
 
     # Plot the Z-axis force field
     plt.figure(figsize=(10, 6))
-    plt.plot(df["header_stamp_sec"], df["force_z"], label="Force Z-Axis")
+    plt.plot(df["timestamp"], df[force_col], label=f"{force_col} (Z-Axis)")
 
     # Add labels and legend
     plt.title("AT40mini Force Sensor Z-Axis Data (Raw Parquet)")
