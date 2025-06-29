@@ -37,9 +37,18 @@ def align_and_downsample(
     alignment_errors = {}
 
     for file in parquet_files:
-        # if file != "/Volumes/drakes_ssd_500gb/skill_assessment/data/S01/parquet/T01/PSM1measured_cp.parquet":
-        #     continue  # Skip baseline file itself
-        
+        if "follow_mode" in os.path.basename(file):
+            print(f"Skipping file containing 'follow_mode': {file}")
+            continue
+        if "jaw" in os.path.basename(file):
+            print(f"Skipping file containing 'jaw': {file}")
+            continue
+        if "PSM3" in os.path.basename(file):
+            print(f"Skipping file containing 'PSM3': {file}")
+            continue
+        if "SUJ" in os.path.basename(file):
+            print(f"Skipping file containing 'SUJ': {file}")
+            continue
         
         df = pd.read_parquet(file)
         
@@ -105,6 +114,17 @@ def align_and_downsample(
 
         print(f"Mean alignment error for {os.path.basename(file)}: {mean_residual:.6f} seconds")
 
+        # Fill NaNs in data fields with 0 (excluding BagFileName)
+        for col in aligned_df.columns:
+            if col not in ['BagFileName', 'header_stamp_sec', 'header_stamp_nsec']:
+                aligned_df[col] = aligned_df[col].fillna(0)
+
+        # Interpolate timestamps forward and backward
+        if 'header_stamp_sec' in aligned_df.columns:
+            aligned_df['header_stamp_sec'] = aligned_df['header_stamp_sec'].interpolate(method='linear', limit_direction='both')
+        if 'header_stamp_nsec' in aligned_df.columns:
+            aligned_df['header_stamp_nsec'] = aligned_df['header_stamp_nsec'].interpolate(method='linear', limit_direction='both')
+
         # Drop unwanted merge artifacts and internal columns, but always preserve BagFileName
         aligned_df = aligned_df.drop(
             columns=[c for c in aligned_df.columns if (c.startswith('timestamp_') or c.startswith('orig_') or c == 'datetime') and c != 'BagFileName'],
@@ -118,6 +138,12 @@ def align_and_downsample(
         last_cols = [c for c in expected_last if c in aligned_df.columns]
         middle_cols = [c for c in aligned_df.columns if c not in first_cols + last_cols]
         aligned_df = aligned_df[first_cols + middle_cols + last_cols]
+
+        # Ensure header_frame_id is cleanly typed
+        if 'header_frame_id' in aligned_df.columns:
+            aligned_df['header_frame_id'] = pd.to_numeric(aligned_df['header_frame_id'], errors='coerce').fillna(0).astype('int64')
+
+        # Clean axes_data column block removed per instructions
 
         # Save aligned DataFrame with preserved original timestamps
         output_file = os.path.join(output_dir, os.path.basename(file))
