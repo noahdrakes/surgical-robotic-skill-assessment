@@ -1,5 +1,9 @@
 import pandas as pd
+import numpy as np
 import os
+from preprocess import find_subject_files
+from tqdm import tqdm
+import shutil
 
 def align_and_downsample(
     parquet_files,
@@ -49,6 +53,11 @@ def align_and_downsample(
         if "SUJ" in os.path.basename(file):
             print(f"Skipping file containing 'SUJ': {file}")
             continue
+        if "clutch" in os.path.basename(file):
+            print(f"Skipping file containing 'SUJ': {file}")
+            continue
+        # if "/Volumes/drakes_ssd_500gb/skill_assessment/data/S01/parquet/T04" not in file:
+        #     continue
         
         df = pd.read_parquet(file)
         
@@ -63,11 +72,6 @@ def align_and_downsample(
         df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
 
         
-
-        # if file == "/Volumes/drakes_ssd_500gb/skill_assessment/data/S01/parquet/T01/PSM1measured_cp.parquet":
-        # print(df)
-        
-
         df = df.set_index("datetime").sort_index()
         df = df[~df.index.duplicated(keep="first")]
         df = df.infer_objects(copy=False)
@@ -114,10 +118,9 @@ def align_and_downsample(
 
         print(f"Mean alignment error for {os.path.basename(file)}: {mean_residual:.6f} seconds")
 
-        # Fill NaNs in data fields with 0 (excluding BagFileName)
-        for col in aligned_df.columns:
-            if col not in ['BagFileName', 'header_stamp_sec', 'header_stamp_nsec']:
-                aligned_df[col] = aligned_df[col].fillna(0)
+        # Fill NaNs in numeric columns only
+        numeric_cols = aligned_df.select_dtypes(include=['number']).columns
+        aligned_df[numeric_cols] = aligned_df[numeric_cols].fillna(0)
 
         # Interpolate timestamps forward and backward
         if 'header_stamp_sec' in aligned_df.columns:
@@ -154,36 +157,78 @@ def align_and_downsample(
 
 # --- Main script ---
 
-path = "/Volumes/drakes_ssd_500gb/skill_assessment/data/S01/parquet/T01/"
-all_entries = os.listdir(path)
+path_to_write_data = "preprocessed_data"
 
-# Filter out files containing "console" or "select"
-parquet_files = [
-    os.path.join(path, f)
-    for f in all_entries
-    if os.path.isfile(os.path.join(path, f))
-    and ".parquet" in f
-    and "console" not in f
-    and "select" not in f
-    and f != ".DS_Store"
-]
+# Creating directory called data preprocessed in the top level of the repo
+path_to_write_data_ = os.path.join(path_to_write_data)
 
-print(f"Files to process: {len(parquet_files)}")
-print(parquet_files)
+# print("is this the error")
+if os.path.exists(path_to_write_data_):
+    # os.rmdir(path_to_write_data_)
+    # remove dir and all of its contents
+    shutil.rmtree(path_to_write_data_)
 
-# Choose the ATImini40 force sensor file as baseline
-baseline_file = next((f for f in parquet_files if 'ATImini40.parquet' in os.path.basename(f)), None)
-if baseline_file is None:
-    raise ValueError("Baseline file ATImini40.parquet not found among input files")
-print(f"Using baseline file: {baseline_file}")
 
-alignment_errors = align_and_downsample(
-    parquet_files,
-    baseline_file=baseline_file,
-    target_frequency="20.833ms",
-    output_dir="aligned_data"
-)
+os.mkdir(path_to_write_data_)
 
-# Print alignment errors
-for file, error in alignment_errors.items():
-    print(f"Mean alignment error for {os.path.basename(file)}: {error:.6f} seconds")
+
+path_to_data = "/Volumes/drakes_ssd_500gb/skill_assessment/data/"
+
+subject_dirs= find_subject_files(path_to_data)
+all_entries = os.listdir(path_to_data)
+
+# print(subject_dirs)
+
+# exit()
+
+for subject_dir in subject_dirs:
+
+    # Progress Bar for Preprocess
+    pbar = tqdm(desc="Subject " + subject_dir)
+
+    # loading all trial dir with parquet files
+    path_to_parquet_files = os.path.join(path_to_data, subject_dir, "parquet")
+    # print(path_to_parquet_files)
+    trial_dirs = [d for d in os.listdir(path_to_parquet_files) if not d.startswith('.')]
+
+
+    # print(trial_dirs)
+    pbar.total = len(trial_dirs)
+
+    # iterating through each trial per subject
+    for trial_count, trial_dir in enumerate(trial_dirs):
+
+        new_df = pd.DataFrame()
+
+        parquet_files = [
+            os.path.join(path_to_parquet_files, trial_dir, f)
+            for f in os.listdir(os.path.join(path_to_parquet_files, trial_dir))
+            if os.path.isfile(os.path.join(path_to_parquet_files, trial_dir, f))
+            and ".parquet" in f
+            and "console" not in f
+            and "select" not in f
+            and f != ".DS_Store"
+        ]
+
+        # print(os.path.join(path_to_parquet_files, trial_dir))
+        # for file in parquet_files:
+        #     print(file)
+
+        output_dir = os.path.join(path_to_write_data, subject_dir, trial_dir)
+
+        print("##### ALIGNING SUBECT: ", subject_dir, " TRIAL: ", trial_dir)
+
+        alignment_errors = align_and_downsample(
+            parquet_files=parquet_files,
+            baseline_file=parquet_files[0],
+            target_frequency="20.833ms",
+            output_dir=output_dir
+        )
+        
+    pbar.update()
+
+        # Print alignment errors
+        # for file, error in alignment_errors.items():
+        #     print(f"Mean alignment error for {os.path.basename(file)}: {error:.6f} seconds")
+
+       
