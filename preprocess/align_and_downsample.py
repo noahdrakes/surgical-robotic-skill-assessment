@@ -114,6 +114,10 @@ def align_and_downsample(
         # For non-original timestamps, backward-fill first, then forward-fill (latch)
         aligned_df[data_cols] = aligned_df[data_cols].bfill().ffill()
 
+        # 6) Latch string columns (e.g., categorical or filename fields) the same way
+        string_cols = aligned_df.select_dtypes(include=['object']).columns
+        aligned_df[string_cols] = aligned_df[string_cols].bfill().ffill()
+
         # Compute new timestamps from the upsampled index
         timestamps_ns = aligned_df.index.astype('int64')
         computed_sec  = (timestamps_ns // 1_000_000_000).astype(float)
