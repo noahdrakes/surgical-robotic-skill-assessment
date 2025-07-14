@@ -8,7 +8,7 @@ import shutil
 def align_and_downsample(
     parquet_files,
     baseline_file,
-    target_frequency="20.833ms",
+    target_frequency="2.6455ms",
     output_dir="aligned_data"
 ):
     """
@@ -37,6 +37,10 @@ def align_and_downsample(
         end=baseline_df.index.max(),
         freq=target_frequency
     )
+
+    # Upsample by adding midpoints between each timestamp
+    midpoints = baseline_index[:-1] + (baseline_index[1:] - baseline_index[:-1]) / 2
+    baseline_index = baseline_index.union(midpoints).sort_values()
 
     alignment_errors = {}
 
@@ -76,10 +80,11 @@ def align_and_downsample(
         df = df[~df.index.duplicated(keep="first")]
         df = df.infer_objects(copy=False)
 
-        # Use merge_asof to align timestamps more robustly
+        # Prepare baseline DataFrame for merge_asof
         baseline_df_tmp = pd.DataFrame(index=baseline_index).reset_index().rename(columns={'index': 'datetime'})
         baseline_df_tmp["timestamp"] = baseline_df_tmp["datetime"].astype('int64') / 1e9
 
+        # Align using merge_asof (nearest within tolerance)
         aligned_df = pd.merge_asof(
             baseline_df_tmp,
             df.reset_index(),
@@ -89,25 +94,53 @@ def align_and_downsample(
         )
         aligned_df = aligned_df.set_index("datetime")
 
-        # Add BagFileName column after merge to avoid coupling issues
+        # Save true stamps for original samples
+        orig_sec  = aligned_df['header_stamp_sec'].copy() if 'header_stamp_sec' in aligned_df.columns else None
+        orig_nsec = aligned_df['header_stamp_nsec'].copy() if 'header_stamp_nsec' in aligned_df.columns else None
+
+        # Mask for exact original timestamps
+        mask_exact = aligned_df.index.isin(df.index)
+
+        # Data columns to process (all numeric sensor fields; exclude only timestamps and seq)
+        data_cols = aligned_df.select_dtypes(include=['number']).columns.difference(
+            ['header_stamp_sec', 'header_stamp_nsec', 'header_seq']
+        )
+
+        # For exact matches, copy original data values
+        for col in data_cols:
+            if col in df.columns:
+                aligned_df.loc[mask_exact, col] = df.loc[aligned_df.index.intersection(df.index), col].values
+
+        # For non-original timestamps, backward-fill first, then forward-fill (latch)
+        aligned_df[data_cols] = aligned_df[data_cols].bfill().ffill()
+
+        # Compute new timestamps from the upsampled index
+        timestamps_ns = aligned_df.index.astype('int64')
+        computed_sec  = (timestamps_ns // 1_000_000_000).astype(float)
+        computed_nsec = (timestamps_ns %  1_000_000_000).astype(float)
+
+        # Preserve original stamps on exact-sample rows, use computed for midpoints
+        if orig_sec is not None:
+            mask_exact = aligned_df.index.isin(df.index)
+            aligned_df['header_stamp_sec']  = np.where(mask_exact, orig_sec,  computed_sec)
+            aligned_df['header_stamp_nsec'] = np.where(mask_exact, orig_nsec, computed_nsec)
+        else:
+            aligned_df['header_stamp_sec']  = computed_sec
+            aligned_df['header_stamp_nsec'] = computed_nsec
+
+        # Reset header_seq as monotonic counter
+        aligned_df['header_seq'] = np.arange(len(aligned_df))
+
+        # Add BagFileName column
         aligned_df["BagFileName"] = os.path.basename(file)
 
-        # print(aligned_df)
-        # while True:
-        #     j= 0
-
         # Calculate alignment error (residual) for original timestamps to nearest baseline timestamp
-        # Ensure orig_times is datetime64[ns] and drop NaNs
-        orig_times = pd.to_datetime(df["orig_datetime"], errors='coerce')
-        orig_times = orig_times[orig_times.notnull()]
-
-        # Ensure baseline_times is a DatetimeIndex
+        orig_times = pd.to_datetime(df["orig_datetime"], errors='coerce').dropna()
         baseline_times = pd.DatetimeIndex(baseline_index)
 
         def nearest_residual(ts):
             if pd.isnull(ts):
                 return None
-            # Find nearest baseline timestamp
             idx = baseline_times.get_indexer([ts], method="nearest")[0]
             nearest = baseline_times[idx]
             return abs((ts - nearest).total_seconds())
@@ -118,15 +151,6 @@ def align_and_downsample(
 
         print(f"Mean alignment error for {os.path.basename(file)}: {mean_residual:.6f} seconds")
 
-        # Fill NaNs in numeric columns only
-        numeric_cols = aligned_df.select_dtypes(include=['number']).columns
-        aligned_df[numeric_cols] = aligned_df[numeric_cols].fillna(0)
-
-        # Interpolate timestamps forward and backward
-        if 'header_stamp_sec' in aligned_df.columns:
-            aligned_df['header_stamp_sec'] = aligned_df['header_stamp_sec'].interpolate(method='linear', limit_direction='both')
-        if 'header_stamp_nsec' in aligned_df.columns:
-            aligned_df['header_stamp_nsec'] = aligned_df['header_stamp_nsec'].interpolate(method='linear', limit_direction='both')
 
         # Drop unwanted merge artifacts and internal columns, but always preserve BagFileName
         aligned_df = aligned_df.drop(
@@ -146,9 +170,7 @@ def align_and_downsample(
         if 'header_frame_id' in aligned_df.columns:
             aligned_df['header_frame_id'] = pd.to_numeric(aligned_df['header_frame_id'], errors='coerce').fillna(0).astype('int64')
 
-        # Clean axes_data column block removed per instructions
-
-        # Save aligned DataFrame with preserved original timestamps
+        # Save aligned DataFrame
         output_file = os.path.join(output_dir, os.path.basename(file))
         aligned_df.to_parquet(output_file)
         print(f"Saved aligned and downsampled file: {output_file}")
@@ -221,7 +243,7 @@ for subject_dir in subject_dirs:
         alignment_errors = align_and_downsample(
             parquet_files=parquet_files,
             baseline_file=parquet_files[0],
-            target_frequency="20.833ms",
+            target_frequency = "5.291005ms",
             output_dir=output_dir
         )
         
@@ -231,4 +253,4 @@ for subject_dir in subject_dirs:
         # for file, error in alignment_errors.items():
         #     print(f"Mean alignment error for {os.path.basename(file)}: {error:.6f} seconds")
 
-       
+
