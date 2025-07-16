@@ -75,7 +75,15 @@ def align_and_downsample(
         # Preserve original timestamps as columns
         df["orig_header_stamp_sec"] = df["header_stamp_sec"]
         df["orig_header_stamp_nsec"] = df["header_stamp_nsec"]
+
+        df["orig_header_stamp_sec"] = pd.to_numeric(df["orig_header_stamp_sec"], errors="coerce")
+        df["orig_header_stamp_nsec"] = pd.to_numeric(df["orig_header_stamp_nsec"], errors="coerce")
+        
         df["orig_datetime"] = pd.to_datetime(df["orig_header_stamp_sec"] + df["orig_header_stamp_nsec"] / 1e9, unit="s")
+
+        num_nats = df["orig_datetime"].isna().sum()
+        if num_nats > 0:
+            print(f"[WARN] {num_nats} NaT values in orig_datetime for file: {file}")
         
 
         # Compute timestamp for alignment
@@ -179,11 +187,14 @@ def align_and_downsample(
             return abs((ts - nearest).total_seconds())
 
         residuals = orig_times.apply(nearest_residual).dropna()
-        mean_residual = residuals.mean()
+        if residuals.empty:
+            print(f"[WARN] Skipping residual error for {file} — not enough valid timestamps")
+            mean_residual = np.nan
+        else:
+            mean_residual = residuals.mean()
+            print(f"Mean alignment error for {os.path.basename(file)}: {mean_residual:.6f} seconds")
+
         alignment_errors[file] = mean_residual
-
-        print(f"Mean alignment error for {os.path.basename(file)}: {mean_residual:.6f} seconds")
-
 
         # Drop unwanted merge artifacts and internal columns, but always preserve BagFileName
         aligned_df = aligned_df.drop(
@@ -267,6 +278,9 @@ for subject_dir in subject_dirs:
 
     # iterating through each trial per subject
     for trial_count, trial_dir in enumerate(trial_dirs):
+
+        # if "2" not in trial_dir:
+        #     continue
 
         new_df = pd.DataFrame()
 
