@@ -9,7 +9,9 @@ def align_and_downsample(
     parquet_files,
     baseline_file,
     target_frequency="2.6455ms",
-    output_dir="aligned_data"
+    output_dir="aligned_data",
+    crop_start=None,
+    crop_end=None
 ):
     """
     Aligns and downsamples Parquet files to a baseline file's timestamps, preserves original timestamps,
@@ -32,6 +34,11 @@ def align_and_downsample(
     baseline_df["timestamp"] = baseline_df["header_stamp_sec"] + baseline_df["header_stamp_nsec"] / 1e9
     baseline_df["datetime"] = pd.to_datetime(baseline_df["timestamp"], unit="s")
     baseline_df = baseline_df.set_index("datetime").sort_index()
+
+    # Cropping dataframe
+    if crop_start and crop_end:
+        baseline_df = baseline_df[(baseline_df.index >= crop_start) & (baseline_df.index <= crop_end)]
+
     baseline_index = pd.date_range(
         start=baseline_df.index.min(),
         end=baseline_df.index.max(),
@@ -57,9 +64,9 @@ def align_and_downsample(
         if "SUJ" in os.path.basename(file):
             print(f"Skipping file containing 'SUJ': {file}")
             continue
-        if "clutch" in os.path.basename(file):
-            print(f"Skipping file containing 'SUJ': {file}")
-            continue
+        # if "clutch" in os.path.basename(file):
+        #     print(f"Skipping file containing 'SUJ': {file}")
+        #     continue
         # if "/Volumes/drakes_ssd_500gb/skill_assessment/data/S01/parquet/T04" not in file:
         #     continue
         
@@ -77,6 +84,11 @@ def align_and_downsample(
 
         
         df = df.set_index("datetime").sort_index()
+
+        ## cropping dataframe
+        if crop_start and crop_end:
+            df = df[(df.index >= crop_start) & (df.index <= crop_end)]
+
         df = df[~df.index.duplicated(keep="first")]
         df = df.infer_objects(copy=False)
 
@@ -117,6 +129,23 @@ def align_and_downsample(
         # 6) Latch string columns (e.g., categorical or filename fields) the same way
         string_cols = aligned_df.select_dtypes(include=['object']).columns
         aligned_df[string_cols] = aligned_df[string_cols].bfill().ffill()
+
+        # 7) Clean string columns: remove newline characters to prevent splitting
+        string_cols = aligned_df.select_dtypes(include=['object']).columns
+        aligned_df[string_cols] = aligned_df[string_cols].map(
+            lambda v: v.replace('\n', ' ') if isinstance(v, str) else v
+        )
+
+        # 8) Serialize array-like columns (lists or ndarrays) to single-line JSON strings
+        import json
+        array_cols = [
+            col for col in aligned_df.columns
+            if aligned_df[col].apply(lambda v: hasattr(v, 'tolist')).any()
+        ]
+        for col in array_cols:
+            aligned_df[col] = aligned_df[col].apply(
+                lambda v: json.dumps(v.tolist(), separators=(',', ':')) if hasattr(v, 'tolist') else v
+            )
 
         # Compute new timestamps from the upsampled index
         timestamps_ns = aligned_df.index.astype('int64')
@@ -181,7 +210,22 @@ def align_and_downsample(
 
     return alignment_errors
 
+def get_crop_times(subject_id: str, trial_id: str, crop_df):
+    try:
+        trial_int = int(trial_id.lstrip("T"))
+        row = crop_df.loc[(subject_id, trial_int)]
+        return pd.to_datetime(row["start_time"], unit="s"), pd.to_datetime(row["end_time"], unit="s")
+    except Exception:
+        print(f"[WARN] No crop times found for {subject_id} trial {trial_id}")
+        return None, None
+    
+
 # --- Main script ---
+
+CROPPED_TIMES_PATH = os.path.join(os.path.dirname(__file__), "croppedTimes.csv")
+crop_df = pd.read_csv(CROPPED_TIMES_PATH, header=None, names=["subject", "trial", "start_time", "end_time"])
+crop_df.set_index(["subject", "trial"], inplace=True)
+
 
 path_to_write_data = "preprocessed_data"
 
@@ -243,12 +287,15 @@ for subject_dir in subject_dirs:
         output_dir = os.path.join(path_to_write_data, subject_dir, trial_dir)
 
         print("##### ALIGNING SUBECT: ", subject_dir, " TRIAL: ", trial_dir)
+        crop_start, crop_end = get_crop_times(subject_dir, trial_dir, crop_df)
 
         alignment_errors = align_and_downsample(
             parquet_files=parquet_files,
             baseline_file=parquet_files[0],
             target_frequency = "5.291005ms",
-            output_dir=output_dir
+            output_dir=output_dir,
+            crop_start=crop_start,
+            crop_end=crop_end
         )
         
     pbar.update()
@@ -256,5 +303,3 @@ for subject_dir in subject_dirs:
         # Print alignment errors
         # for file, error in alignment_errors.items():
         #     print(f"Mean alignment error for {os.path.basename(file)}: {error:.6f} seconds")
-
-
