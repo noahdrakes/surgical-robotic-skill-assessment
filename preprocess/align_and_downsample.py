@@ -48,7 +48,8 @@ def _align_to_baseline(baseline_df_tmp, df, target_frequency):
         df.reset_index(),
         on="datetime",
         direction="nearest",
-        tolerance=pd.Timedelta(target_frequency)
+        tolerance=pd.Timedelta(target_frequency),
+        allow_exact_matches=True
     )
     aligned_df = aligned_df.set_index("datetime")
     return aligned_df
@@ -205,12 +206,18 @@ def align_and_downsample(
     # Crop baseline dataframe if requested
     baseline_df = _crop_dataframe(baseline_df, crop_start, crop_end)
 
-    # Create upsampled baseline index with midpoints
-    baseline_index = _create_upsampled_index(
-        start=baseline_df.index.min(),
-        end=baseline_df.index.max(),
-        freq=target_frequency
-    )
+    # Prepare the baseline index and baseline_df_tmp according to target_frequency
+    if target_frequency is not None:
+        baseline_index = _create_upsampled_index(
+            start=baseline_df.index.min(),
+            end=baseline_df.index.max(),
+            freq=target_frequency
+        )
+        baseline_df_tmp = _prepare_baseline_for_alignment(baseline_index, target_frequency)
+    else:
+        baseline_index = baseline_df.index
+        baseline_df_tmp = pd.DataFrame({'datetime': baseline_index})
+        baseline_df_tmp["timestamp"] = baseline_df_tmp["datetime"].astype('int64') / 1e9
 
     alignment_errors = {}
 
@@ -242,17 +249,15 @@ def align_and_downsample(
         df = df[~df.index.duplicated(keep="first")]
         df = df.infer_objects(copy=False)
 
-        # Prepare baseline DataFrame for merge_asof
-        baseline_df_tmp = _prepare_baseline_for_alignment(baseline_index, target_frequency)
-
-        # Align using merge_asof
-        aligned_df = _align_to_baseline(baseline_df_tmp, df, target_frequency)
+        # Align using merge_asof or use df directly if target_frequency is None
+        if target_frequency is None:
+            aligned_df = df.copy()
+        else:
+            aligned_df = _align_to_baseline(baseline_df_tmp, df, target_frequency)
+            aligned_df = _fill_missing_data(aligned_df, df)
 
         # Reconstruct timestamps preserving original where possible
         aligned_df = _reconstruct_timestamps(aligned_df, df)
-
-        # Fill missing numeric and string data by latching
-        aligned_df = _fill_missing_data(aligned_df, df)
 
         # Clean string and array-like columns
         aligned_df = _clean_string_and_array_columns(aligned_df)
@@ -355,7 +360,8 @@ for subject_dir in subject_dirs:
         alignment_errors = align_and_downsample(
             parquet_files=parquet_files,
             baseline_file=parquet_files[0],
-            target_frequency = "5.291005ms",
+            # target_frequency = "5.291005ms",
+            target_frequency=None,
             output_dir=output_dir,
             crop_start=crop_start,
             crop_end=crop_end
