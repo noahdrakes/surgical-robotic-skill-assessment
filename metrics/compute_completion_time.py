@@ -26,8 +26,8 @@ def add_all_subjects(manager, path_to_data):
 
         subject_path = os.path.join(path_to_data, subject_dir)
 
-        # Loading all trial directories with parquet files
-        subject_trials = [os.path.join(subject_path, f) for f in os.listdir(subject_path) if os.path.isfile(os.path.join(subject_path, f))]
+        # Loading all trial directories (directories like T01, T02, etc.)
+        subject_trials = [os.path.join(subject_path, f) for f in os.listdir(subject_path) if os.path.isdir(os.path.join(subject_path, f))]
 
         num_trials = len(subject_trials)
         pbar.total = num_trials
@@ -48,18 +48,15 @@ manager = MetricsManager(config_path="metric_config.json")
 
 print("adding all subjects")
 
-path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed"
+path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data"
 add_all_subjects(manager, path_to_data)
 
 print("subjects added")
 
-header_path = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/data_preprocessed/S01/rostopics_header.txt"
 output_csv_path = "results.csv"
 
 print("exporting to csv")
 
-metric_names = ["completion_time"]
-manager.export_metrics_to_csv(metric_names, output_csv_path, header_path)
+metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude"]
+manager.export_metrics_to_csv(metric_names, output_csv_path)
 print("finished")
-
-

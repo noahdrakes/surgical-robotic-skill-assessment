@@ -1,31 +1,45 @@
 {
     "completion_time": {
-        "timestamp_axis": "timestamp",
-        "ATImini40": {
-            "fields": ["ATImini40_force_x", "ATImini40_force_y", "ATImini40_force_z"]
-        },
-        "use_force_sensor": true
+        "files": ["accel_left.parquet"],
+        "timestamp_col": "ts_ns",
+        "use_force_sensor": false
     },
     "average_speed_magnitude": {
-        "PSM1measured_cp": {
-            "fields": ["PSM1measured_cp_pos_x", "PSM1measured_cp_pos_y", "PSM1measured_cp_pos_z"]
+        "PSM1": {
+            "files": ["PSM1measured_cp.parquet"],
+            "fields": ["pos_x", "pos_y", "pos_z"]
         },
-        "PSM2measured_cp": {
-            "fields": ["PSM2measured_cp_pos_x", "PSM2measured_cp_pos_y", "PSM2measured_cp_pos_z"]
+        "PSM2": {
+            "files": ["PSM2measured_cp.parquet"],
+            "fields": ["pos_x", "pos_y", "pos_z"]
         }
     },
     "average_acceleration_magnitude": {
-        "PSM1measured_cp": {
-            "velocity_fields": ["PSM1measured_cp_x", "PSM1measured_cp_y", "PSM1measured_cp_z"],
-            "acceleration_fields": ["PSM1measured_accel_x", "PSM1measured_accel_y", "PSM1measured_accel_z"],
-            "timestamp_axis": "timestamp",
-            "using_accel": false
+        "PSM1": {
+            "files": ["PSM1measured_cp.parquet", "accel_left.parquet"],
+            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
         },
-        "PSM2measured_cp": {
-            "velocity_fields": ["PSM2measured_cp_x", "PSM2measured_cp_y", "PSM2measured_cp_z"],
-            "acceleration_fields": ["PSM2measured_accel_x", "PSM2measured_accel_y", "PSM2measured_accel_z"],
-            "timestamp_axis": "timestamp",
-            "using_accel": false
+        "PSM2": {
+            "files": ["PSM2measured_cp.parquet", "accel_right.parquet"],
+            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        }
+    },
+    "average_jerk_magnitude": {
+        "PSM1": {
+            "files": ["PSM1bodymeasured_cv.parquet"],
+            "velocity_fields": ["linear_x", "linear_y", "linear_z"],
+            "timestamp_col": "ts_ns"
+        },
+        "PSM2": {
+            "files": ["PSM2bodymeasured_cv.parquet"],
+            "velocity_fields": ["linear_x", "linear_y", "linear_z"],
+            "timestamp_col": "ts_ns"
         }
     }
 }

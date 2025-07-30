@@ -9,17 +9,26 @@ import json
 def _compute_timestamps(df):
     """
     Compute combined timestamp columns and datetime index.
+    Store timestamp_float as relative to the first timestamp (float64).
     """
-    df["timestamp"] = df["header_stamp_sec"] + df["header_stamp_nsec"] / 1e9
-    df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
+    # Build integer nanosecond timestamp and compute relative float seconds
+    sec_int = df["header_stamp_sec"].astype("int64")
+    nsec_int = df["header_stamp_nsec"].astype("int64")
+    ts_ns = sec_int * 1_000_000_000 + nsec_int
+    df["ts_ns"] = ts_ns
+    # Relative timestamp_float in seconds
+    delta_ns = ts_ns - ts_ns.iloc[0]
+    df["timestamp_float"] = delta_ns.astype("float64") / 1e9
     return df
 
 def _crop_dataframe(df, crop_start, crop_end):
     """
-    Crop dataframe to the specified datetime range.
+    Crop dataframe to the specified time range.
     """
     if crop_start and crop_end:
-        df = df[(df.index >= crop_start) & (df.index <= crop_end)]
+        start_ns = int(crop_start.value)
+        end_ns = int(crop_end.value)
+        df = df[(df.index >= start_ns) & (df.index <= end_ns)]
     return df
 
 def _create_upsampled_index(start, end, freq):
@@ -35,8 +44,12 @@ def _prepare_baseline_for_alignment(baseline_index, target_frequency):
     """
     Prepare a baseline DataFrame for merge_asof alignment.
     """
-    baseline_df_tmp = pd.DataFrame(index=baseline_index).reset_index().rename(columns={'index': 'datetime'})
-    baseline_df_tmp["timestamp"] = baseline_df_tmp["datetime"].astype('int64') / 1e9
+    baseline_df_tmp = (
+        pd.DataFrame(index=baseline_index)
+          .reset_index()
+          .rename(columns={"index": "ts_ns"})
+    )
+    baseline_df_tmp["timestamp"] = baseline_df_tmp["ts_ns"].astype("int64") / 1e9
     return baseline_df_tmp
 
 def _align_to_baseline(baseline_df_tmp, df, target_frequency):
@@ -46,58 +59,36 @@ def _align_to_baseline(baseline_df_tmp, df, target_frequency):
     aligned_df = pd.merge_asof(
         baseline_df_tmp,
         df.reset_index(),
-        on="datetime",
+        on="ts_ns",
         direction="nearest",
         tolerance=pd.Timedelta(target_frequency),
         allow_exact_matches=True
     )
-    aligned_df = aligned_df.set_index("datetime")
+    aligned_df = aligned_df.set_index("ts_ns")
+    # Remove duplicate timestamps to avoid repeated samples
+    aligned_df = aligned_df[~aligned_df.index.duplicated(keep="first")]
     return aligned_df
 
 def _reconstruct_timestamps(aligned_df, df):
     """
-    Reconstruct header_stamp_sec and header_stamp_nsec columns preserving original timestamps when exact match.
+    Reconstruct timestamp_float using the integer nanosecond index.
     """
-    orig_sec = aligned_df['header_stamp_sec'].copy() if 'header_stamp_sec' in aligned_df.columns else None
-    orig_nsec = aligned_df['header_stamp_nsec'].copy() if 'header_stamp_nsec' in aligned_df.columns else None
-
-    mask_exact = aligned_df.index.isin(df.index)
-
-    timestamps_ns = aligned_df.index.astype('int64')
-    computed_sec = (timestamps_ns // 1_000_000_000).astype(float)
-    computed_nsec = (timestamps_ns % 1_000_000_000).astype(float)
-
-    if orig_sec is not None:
-        aligned_df['header_stamp_sec'] = np.where(mask_exact, orig_sec, computed_sec)
-        aligned_df['header_stamp_nsec'] = np.where(mask_exact, orig_nsec, computed_nsec)
-    else:
-        aligned_df['header_stamp_sec'] = computed_sec
-        aligned_df['header_stamp_nsec'] = computed_nsec
-
+    if df.index.duplicated().any():
+        print(f"[WARN] Original parquet has repeating timestamps: {df.get('BagFileName', 'Unknown')}")
+    if aligned_df.empty:
+        aligned_df["timestamp_float"] = []
+        return aligned_df
+    # Use ts_ns index (int64 nanoseconds)
+    ts_ns = aligned_df.index.astype("int64")
+    first_ns = ts_ns[0]
+    delta_ns = ts_ns - first_ns
+    aligned_df["timestamp_float"] = delta_ns.astype("float64") / 1e9
     return aligned_df
 
 def _fill_missing_data(aligned_df, df):
     """
-    Fill missing numeric and string data in aligned_df by latching values.
+    Do not fill missing data. Return the aligned DataFrame unchanged.
     """
-    # Identify numeric data columns excluding timestamp and seq columns
-    data_cols = aligned_df.select_dtypes(include=['number']).columns.difference(
-        ['header_stamp_sec', 'header_stamp_nsec', 'header_seq']
-    )
-
-    # For exact matches, copy original data values
-    mask_exact = aligned_df.index.isin(df.index)
-    for col in data_cols:
-        if col in df.columns:
-            aligned_df.loc[mask_exact, col] = df.loc[aligned_df.index.intersection(df.index), col].values
-
-    # Backward-fill then forward-fill numeric columns to latch data
-    aligned_df[data_cols] = aligned_df[data_cols].bfill().ffill()
-
-    # Latch string columns similarly
-    string_cols = aligned_df.select_dtypes(include=['object']).columns
-    aligned_df[string_cols] = aligned_df[string_cols].bfill().ffill()
-
     return aligned_df
 
 def _clean_string_and_array_columns(aligned_df):
@@ -125,40 +116,46 @@ def _calculate_alignment_error(df, baseline_index):
     """
     Calculate mean alignment error (residual) between original timestamps and nearest baseline timestamps.
     """
-    orig_times = pd.to_datetime(df["orig_datetime"], errors='coerce').dropna()
-    baseline_times = pd.DatetimeIndex(baseline_index)
-
-    def nearest_residual(ts):
-        if pd.isnull(ts):
-            return None
-        idx = baseline_times.get_indexer([ts], method="nearest")[0]
-        nearest = baseline_times[idx]
-        return abs((ts - nearest).total_seconds())
-
-    residuals = orig_times.apply(nearest_residual).dropna()
-    if residuals.empty:
+    residuals = []
+    for ts in df.index:
+        try:
+            ts_float = ts / 1e9
+            nearest = min(baseline_index, key=lambda x: abs(x - ts_float))
+            residuals.append(abs(ts_float - nearest))
+        except Exception:
+            continue
+    if len(residuals) == 0:
         return np.nan
     else:
-        return residuals.mean()
+        return np.mean(residuals)
 
 def _finalize_and_save_dataframe(aligned_df, file, output_dir):
     """
     Finalize dataframe by resetting sequence, organizing columns, cleaning types, and saving parquet file.
     """
-    # Reset header_seq as monotonic counter
-    aligned_df['header_seq'] = np.arange(len(aligned_df))
+    # Preserve original header_seq if it exists
+    if 'header_seq' not in aligned_df.columns:
+        aligned_df['header_seq'] = np.arange(len(aligned_df))
 
-    # Add BagFileName column
-    aligned_df["BagFileName"] = os.path.basename(file)
 
     # Drop unwanted merge artifacts and internal columns except BagFileName
     aligned_df = aligned_df.drop(
-        columns=[c for c in aligned_df.columns if (c.startswith('timestamp_') or c.startswith('orig_') or c == 'datetime') and c != 'BagFileName'],
+        columns=[
+            c for c in aligned_df.columns
+            if (
+                (c.startswith('timestamp_'))
+                or (c.startswith('orig_') and not c.startswith('orig_header_stamp'))
+                or c == 'datetime'
+            )
+            and c != 'BagFileName'
+        ],
         errors='ignore'
     )
+    # Always drop header_stamp_sec and header_stamp_nsec if they exist
+    # aligned_df = aligned_df.drop(columns=["header_stamp_sec", "header_stamp_nsec"], errors="ignore")
 
     # Preserve original header order
-    expected_first = ['header_seq', 'header_stamp_sec', 'header_stamp_nsec', 'header_frame_id']
+    expected_first = ['header_seq', 'ts_ns', 'header_frame_id']
     expected_last = ['BagFileName']
     first_cols = [c for c in expected_first if c in aligned_df.columns]
     last_cols = [c for c in expected_last if c in aligned_df.columns]
@@ -177,7 +174,7 @@ def _finalize_and_save_dataframe(aligned_df, file, output_dir):
 def align_and_downsample(
     parquet_files,
     baseline_file,
-    target_frequency="2.6455ms",
+    target_frequency=None,
     output_dir="aligned_data",
     crop_start=None,
     crop_end=None
@@ -199,9 +196,11 @@ def align_and_downsample(
 
     # Load baseline file and compute timestamps
     baseline_df = pd.read_parquet(baseline_file)
-    baseline_df["timestamp"] = baseline_df["header_stamp_sec"] + baseline_df["header_stamp_nsec"] / 1e9
-    baseline_df["datetime"] = pd.to_datetime(baseline_df["timestamp"], unit="s")
-    baseline_df = baseline_df.set_index("datetime").sort_index()
+    # Build integer nanosecond baseline index
+    sec_int = baseline_df["header_stamp_sec"].astype("int64")
+    nsec_int = baseline_df["header_stamp_nsec"].astype("int64")
+    baseline_df["ts_ns"] = sec_int * 1_000_000_000 + nsec_int
+    baseline_df = baseline_df.set_index("ts_ns")
 
     # Crop baseline dataframe if requested
     baseline_df = _crop_dataframe(baseline_df, crop_start, crop_end)
@@ -216,8 +215,7 @@ def align_and_downsample(
         baseline_df_tmp = _prepare_baseline_for_alignment(baseline_index, target_frequency)
     else:
         baseline_index = baseline_df.index
-        baseline_df_tmp = pd.DataFrame({'datetime': baseline_index})
-        baseline_df_tmp["timestamp"] = baseline_df_tmp["datetime"].astype('int64') / 1e9
+        baseline_df_tmp = None
 
     alignment_errors = {}
 
@@ -232,29 +230,36 @@ def align_and_downsample(
         # Preserve original timestamps as columns
         df["orig_header_stamp_sec"] = pd.to_numeric(df["header_stamp_sec"], errors="coerce")
         df["orig_header_stamp_nsec"] = pd.to_numeric(df["header_stamp_nsec"], errors="coerce")
-        df["orig_datetime"] = pd.to_datetime(df["orig_header_stamp_sec"] + df["orig_header_stamp_nsec"] / 1e9, unit="s")
 
-        num_nats = df["orig_datetime"].isna().sum()
+        num_nats = df["orig_header_stamp_sec"].isna().sum() + df["orig_header_stamp_nsec"].isna().sum()
         if num_nats > 0:
-            print(f"[WARN] {num_nats} NaT values in orig_datetime for file: {file}")
+            print(f"[WARN] {num_nats} NaN values in original header stamp for file: {file}")
+
+        if target_frequency is None:
+            # Preserve raw nanosecond timestamp as ts_ns
+            sec_int = df["orig_header_stamp_sec"].astype("int64")
+            nsec_int = df["orig_header_stamp_nsec"].astype("int64")
+            df["ts_ns"] = sec_int * 1_000_000_000 + nsec_int
+            # Drop original stamp and float timestamp columns
+            df = df.drop(columns=["header_stamp_sec", "header_stamp_nsec", "timestamp_float"], errors="ignore")
+            # Remove duplicate nanosecond timestamps
+            df = df[~df["ts_ns"].duplicated(keep="first")]
+            aligned_df = df.copy()
+            _finalize_and_save_dataframe(aligned_df, file, output_dir)
+            # Skip further processing for this file
+            continue
 
         # Compute timestamps for alignment
         df = _compute_timestamps(df)
-        df = df.set_index("datetime").sort_index()
+        df = df.set_index("ts_ns")  # use integer nanosecond index consistently
+        # Remove any duplicate nanosecond indices
+        df = df[~df.index.duplicated(keep="first")]
 
         # Crop dataframe if requested
         df = _crop_dataframe(df, crop_start, crop_end)
 
-        # Remove duplicated indices
-        df = df[~df.index.duplicated(keep="first")]
-        df = df.infer_objects(copy=False)
-
-        # Align using merge_asof or use df directly if target_frequency is None
-        if target_frequency is None:
-            aligned_df = df.copy()
-        else:
-            aligned_df = _align_to_baseline(baseline_df_tmp, df, target_frequency)
-            aligned_df = _fill_missing_data(aligned_df, df)
+        aligned_df = _align_to_baseline(baseline_df_tmp, df, target_frequency)
+        aligned_df = _fill_missing_data(aligned_df, df)
 
         # Reconstruct timestamps preserving original where possible
         aligned_df = _reconstruct_timestamps(aligned_df, df)

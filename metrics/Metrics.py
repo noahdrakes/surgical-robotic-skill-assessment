@@ -3,6 +3,7 @@ import math
 import csv
 import json
 import pandas as pd
+import os
 
 completion_time_count = 0
 
@@ -10,9 +11,18 @@ class Metrics:
     def __init__(self, subject, num_trials):
         self.name = subject
         self.num_trials = num_trials
+        self.metric_fns = {
+            "completion_time": self.compute_completion_time,
+            "average_speed_magnitude": self.compute_average_speed_magnitude,
+            "average_acceleration_magnitude": self.compute_average_acceleration_magnitude,
+            "average_jerk_magnitude": self.compute_average_jerk_magnitude,
+        }
 
-    def compute_completion_time(self, trial_data, config):
-        timestamps = trial_data[config["timestamp_axis"]]
+    def compute_completion_time(self, dfs, config):
+        # dfs is a dict of DataFrames keyed by filename
+        # For completion_time, expect single file, get first file's df
+        trial_data = list(dfs.values())[0]
+        timestamps = trial_data[config["timestamp_col"]]
 
         if config["use_force_sensor"] == False:
             return float(timestamps.iloc[-1] - timestamps.iloc[0])
@@ -30,7 +40,7 @@ class Metrics:
             count = 0
 
             ### FIRST FORCE IMPULSE ## 
-            while (count >= len_force_z_data):
+            while (count < len_force_z_data):
 
                 force_z_magnitude = force_z_data[count]
 
@@ -43,7 +53,7 @@ class Metrics:
             index_of_first_button_press = count
 
             ## first button press timestamp
-            first_button_press_timestamp = timestamps[index_of_first_button_press]
+            first_button_press_timestamp = timestamps.iloc[index_of_first_button_press]
 
             # checking the last button press within 20 seconds of the first button press
             end_range = first_button_press_timestamp + 20
@@ -60,7 +70,7 @@ class Metrics:
                 if force_z_magnitude < -2:
                     last_button_press_idx = i
 
-                if timestamps[i] > end_range:
+                if timestamps.iloc[i] > end_range:
                     break
             
             # print("timestamp of last button press: ", timestamps[last_button_press_idx])
@@ -74,10 +84,10 @@ class Metrics:
             
 
             ### LAST FORCE IMPULSE ###
+            low_magnitude_idx = None
             while (count >= len_force_z_data - 2000):
 
                 force_z_magnitude = force_z_data[count]
-                low_magnitude_idx = count
 
                 if force_z_magnitude >= -.1 and force_z_magnitude <= .1 :
                     # print("mag: ", force_z_magnitude)
@@ -90,45 +100,103 @@ class Metrics:
 
             return float(timestamps.iloc[-1] - timestamps.iloc[last_button_press_idx])
         
-    def compute_average_speed_magnitude(self, trial_data, rostopic_config):
+    def compute_average_speed_magnitude(self, dfs, rostopic_config):
+        # dfs: dict of DataFrames, expect one file per rostopic_config
+        trial_data = list(dfs.values())[0]
         speed_magnitude = 0
         for field in rostopic_config["fields"]:
             speed_avg = trial_data[field].mean()
             speed_magnitude += pow(speed_avg, 2)
         return float(math.sqrt(speed_magnitude))
 
-    def compute_average_acceleration_magnitude(self, trial_data, rostopic_config):
-        accel_sqrd = 0
-        timestamps = trial_data[rostopic_config["timestamp_axis"]]
-        dt = np.diff(timestamps)
+    def compute_average_acceleration_magnitude(self, dfs, config):
+        # If using_accel is True and an accel file is present, use it
+        if config["using_accel"] and len(dfs) > 1:
+            accel_df = next((df for fname, df in dfs.items() if "accel" in fname.lower()), None)
+            if accel_df is not None:
+                accel_sqrd = 0
+                for field in config["acceleration_fields"]:
+                    acceleration = accel_df[field]
+                    accel_sqrd += pow(acceleration.mean(), 2)
+                return float(math.sqrt(accel_sqrd))
 
-        if not rostopic_config["using_accel"]:
-            for field in rostopic_config["velocity_fields"]:
-                velocity = trial_data[field]
-                acceleration = np.diff(velocity) / dt
-                accel_sqrd += pow(acceleration.mean(), 2)
-        else:
-            for field in rostopic_config["acceleration_fields"]:
-                acceleration = trial_data[field]
-                accel_sqrd += pow(acceleration.mean(), 2)
+        # Otherwise compute acceleration from velocity
+        trial_data = list(dfs.values())[0]
+        timestamps = trial_data[config["timestamp_col"]]
+        dt = np.diff(timestamps)
+        # DEBUG: Check for invalid dt values before using
+        invalid_mask = (np.isnan(dt) | np.isinf(dt) | (dt == 0))
+        if np.any(invalid_mask):
+            print(f"DEBUG for subject: {self.name}")
+            print(f"DEBUG files: {list(dfs.keys())}")
+            print("Any zeros in dt? ", np.any(dt == 0))
+            print("Any NaNs in dt?  ", np.any(np.isnan(dt)))
+            print("Any Infs in dt?  ", np.any(np.isinf(dt)))
+            print("dt stats: min =", np.nanmin(dt), "max =", np.nanmax(dt))
+            zero_indices = np.where(dt == 0)[0]
+            for idx in zero_indices:
+                ts1_ns = trial_data.iloc[idx]["ts_ns"]
+                ts2_ns = trial_data.iloc[idx+1]["ts_ns"]
+                print(f"Zero dt at index {idx}, ts_ns: {ts1_ns} and {ts2_ns}")
+            # Save the trial to debug.csv
+            debug_path = os.path.join(os.path.dirname(__file__), "..", "debug.csv")
+            trial_data.to_csv(debug_path, index=False)
+        accel_sqrd = 0
+        for field in config["velocity_fields"]:
+            velocity = trial_data[field]
+            acceleration = np.diff(velocity) / dt
+            accel_sqrd += pow(acceleration.mean(), 2)
 
         return float(math.sqrt(accel_sqrd))
 
-    def compute_metric(self, metric_name, trial_data, config):
-        if metric_name == "completion_time":
-            return self.compute_completion_time(trial_data, config)
-        elif metric_name == "average_speed_magnitude":
-            results = {}
-            for rostopic, rostopic_config in config.items():
-                results[rostopic] = self.compute_average_speed_magnitude(trial_data, rostopic_config)
-            return results
-        elif metric_name == "average_acceleration_magnitude":
-            results = {}
-            for rostopic, rostopic_config in config.items():
-                results[rostopic] = self.compute_average_acceleration_magnitude(trial_data, rostopic_config)
-            return results
-        else:
+    def compute_average_jerk_magnitude(self, dfs, config):
+        trial_data = list(dfs.values())[0]
+        timestamps = trial_data[config["timestamp_col"]]
+
+        dt = np.diff(timestamps)
+        # DEBUG: Check for invalid dt values before using
+        invalid_mask = (np.isnan(dt) | np.isinf(dt) | (dt == 0))
+        if np.any(invalid_mask):
+            print(f"DEBUG for subject: {self.name}")
+            print(f"DEBUG files: {list(dfs.keys())}")
+            print("Any zeros in dt? ", np.any(dt == 0))
+            print("Any NaNs in dt?  ", np.any(np.isnan(dt)))
+            print("Any Infs in dt?  ", np.any(np.isinf(dt)))
+            print("dt stats: min =", np.nanmin(dt), "max =", np.nanmax(dt))
+            zero_indices = np.where(dt == 0)[0]
+            for idx in zero_indices:
+                ts1_ns = trial_data.iloc[idx]["ts_ns"]
+                ts2_ns = trial_data.iloc[idx+1]["ts_ns"]
+                print(f"Zero dt at index {idx}, ts_ns: {ts1_ns} and {ts2_ns}")
+            # Save the trial to debug.csv
+            debug_path = os.path.join(os.path.dirname(__file__), "..", "debug.csv")
+            trial_data.to_csv(debug_path, index=False)
+            # return 1
+        jerk_sqrd = 0
+
+        for field in config["velocity_fields"]:
+            velocity = trial_data[field]
+            acceleration = np.diff(velocity) / dt
+            # print(acceleration)
+            dt_accel = dt[1:]
+            jerk = np.diff(acceleration) / dt_accel
+            jerk_sqrd += np.mean(jerk**2)
+        
+        return float(math.sqrt(jerk_sqrd))
+    
+    def compute_metric(self, metric_name, dfs, config):
+        if metric_name not in self.metric_fns:
             raise ValueError(f"Metric '{metric_name}' is not supported.")
+
+        compute_fn = self.metric_fns[metric_name]
+
+        if "files" in config:
+            return compute_fn(dfs, config)
+
+        results = {}
+        for psm_key, psm_config in config.items():
+            results[psm_key] = compute_fn(dfs, psm_config)
+        return results
 
 
 class MetricsManager:
@@ -146,82 +214,134 @@ class MetricsManager:
             raise ValueError(f"Subject {subject_name} not found. Please add the subject first.")
         self.subjects[subject_name]["trial_paths"].append(trial_path)
 
-    def load_trial_data(self, trial_path, header_path):
-        with open(header_path, "r") as f:
-            header = f.readline().strip().split(",")
-        trial_data = pd.read_csv(trial_path, header=None)
-        trial_data.columns = header
-        return trial_data
+    def load_parquet(self, trial_dir, file_name):
+        file_path = os.path.join(trial_dir, file_name)
+        if not os.path.exists(file_path):
+            return None
+        return pd.read_parquet(file_path)
 
-    def compute_metric_for_subject(self, subject_name, metric_name, header_path):
+    def load_required_files(self, trial_path, config):
+        if "files" in config:
+            return {f: self.load_parquet(trial_path, f) for f in config["files"]}
+        else:
+            return {
+                key: {f: self.load_parquet(trial_path, f) for f in subcfg["files"]}
+                for key, subcfg in config.items()
+            }
+
+    def compute_metric_for_subject(self, subject_name, metric_name, psms=None):
         if subject_name not in self.subjects:
             raise ValueError(f"No trials found for subject: {subject_name}")
 
         metrics = self.subjects[subject_name]["metrics"]
         trial_paths = self.subjects[subject_name]["trial_paths"]
 
+        config = self.metric_config[metric_name]
+
         results = []
         for trial_path in trial_paths:
-            trial_data_frame = self.load_trial_data(trial_path, header_path)
-            config = self.metric_config[metric_name]
-            metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-            results.append({"Trial": trial_path, "Result": metric_result})
+            if "files" in config:
+                dfs = self.load_required_files(trial_path, config)
+                if any(df is None for df in dfs.values()):
+                    print(f"Skipping {metric_name} for {trial_path}: missing files.")
+                    continue
+                metric_result = metrics.compute_metric(metric_name, dfs, config)
+                results.append({"Trial": trial_path, "Result": metric_result})
+            else:
+                # multi-PSM config
+                trial_results = {}
+                for psm_key, psm_config in config.items():
+                    if psms is not None and psm_key not in psms:
+                        continue
+                    dfs = self.load_required_files(trial_path, psm_config)
+                    if any(df is None for df in dfs.values()):
+                        print(f"Skipping {metric_name} for {trial_path} PSM {psm_key}: missing files.")
+                        continue
+                    metric_result = metrics.compute_metric(metric_name, dfs, psm_config)
+                    trial_results[psm_key] = metric_result
+                results.append({"Trial": trial_path, "Result": trial_results})
 
         return results
 
-    def export_metrics_to_csv(self, metric_names, output_csv_path, header_path):
+    def export_metrics_to_csv(self, metric_names, output_csv_path):
         """
         Export computed metrics for all subjects and trials to a single CSV file.
 
         Args:
             metric_names (list): List of metric names to compute.
             output_csv_path (str): Path to save the CSV file.
-            header_path (str): Path to the rostopics header file.
         """
         csv_data = []
-        header = ["Subject", "Trial", "Metric", "Rostopic", "Value"]
+        header = ["Subject", "Trial", "Metric", "Domain", "Value"]
 
         for subject_name, subject_data in self.subjects.items():
             trial_paths = subject_data["trial_paths"]
             metrics = subject_data["metrics"]
 
             for trial_idx, trial_path in enumerate(trial_paths):
-                trial_data_frame = self.load_trial_data(trial_path, header_path)
 
                 print(subject_name)
                 print(trial_path)
                 for metric_name in metric_names:
                     config = self.metric_config[metric_name]
-                    metric_results = metrics.compute_metric(metric_name, trial_data_frame, config)
 
-                    # Handle single-value metrics (e.g., completion_time)
-                    if isinstance(metric_results, float):
-                        row = [subject_name, f"Trial {trial_idx + 1}", metric_name, "N/A", metric_results]
-                        csv_data.append(row)
-                    # Handle multi-value metrics (e.g., average_speed_magnitude)
-                    elif isinstance(metric_results, dict):
-                        for rostopic, value in metric_results.items():
-                            row = [subject_name, f"Trial {trial_idx + 1}", metric_name, rostopic, value]
+                    if "files" in config:
+                        dfs = self.load_required_files(trial_path, config)
+                        if any(df is None for df in dfs.values()):
+                            print(f"Skipping {metric_name} for {trial_path}: missing files.")
+                            continue
+                        metric_results = metrics.compute_metric(metric_name, dfs, config)
+
+                        # Handle single-value metrics (e.g., completion_time)
+                        if isinstance(metric_results, float):
+                            row = [subject_name, f"Trial {trial_idx + 1}", metric_name, "N/A", metric_results]
                             csv_data.append(row)
+                        # Handle multi-value metrics (e.g., average_speed_magnitude)
+                        elif isinstance(metric_results, dict):
+                            for domain, value in metric_results.items():
+                                row = [subject_name, f"Trial {trial_idx + 1}", metric_name, domain, value]
+                                csv_data.append(row)
+                        else:
+                            raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_results)}")
                     else:
-                        raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_results)}")
+                        # multi-PSM config
+                        for psm_key, psm_config in config.items():
+                            dfs = self.load_required_files(trial_path, psm_config)
+                            if any(df is None for df in dfs.values()):
+                                print(f"Skipping {metric_name} for {trial_path} PSM {psm_key}: missing files.")
+                                continue
+                            metric_results = metrics.compute_metric(metric_name, dfs, psm_config)
+
+                            # For multi-PSM metrics, flatten results by PSM
+                            if isinstance(metric_results, float):
+                                row = [subject_name, f"Trial {trial_idx + 1}", metric_name, psm_key, metric_results]
+                                csv_data.append(row)
+                            elif isinstance(metric_results, dict):
+                                for domain, value in metric_results.items():
+                                    row = [subject_name, f"Trial {trial_idx + 1}", metric_name, f"{psm_key}:{domain}", value]
+                                    csv_data.append(row)
+                            else:
+                                raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_results)}")
 
         df = pd.DataFrame(csv_data, columns=header)
         df.to_csv(output_csv_path, index=False)
 
         print(f"Metrics saved to {output_csv_path}")
 
-    def export_all_metrics_to_csv(self, metric_names, output_csv_path, header_path):
+    def export_all_metrics_to_csv(self, metric_names, output_csv_path):
         """
         Export all computed metrics for all subjects and trials to a single CSV file.
 
         Args:
             metric_names (list): List of metric names to compute.
             output_csv_path (str): Path to save the CSV file.
-            header_path (str): Path to the rostopics header file.
         """
         csv_data = []
-        header = ["Subject", "Trial", "PSM"] + metric_names  # CSV header with all metrics
+        # For multi-PSM, header should allow for PSM column plus metric columns
+        # But since metrics may vary in structure, keep simple header with variable length rows
+        # We'll output: Subject, Trial, PSM, Metric, Value for each metric result row
+
+        header = ["Subject", "Trial", "PSM", "Metric", "Value"]
 
         for subject_name, subject_data in self.subjects.items():
             print(subject_name)
@@ -229,33 +349,46 @@ class MetricsManager:
             metrics = subject_data["metrics"]
 
             for trial_idx, trial_path in enumerate(trial_paths):
-                trial_data_frame = self.load_trial_data(trial_path, header_path)
-
-                # Check if the metric has sub-configurations
-                row = [subject_name, f"Trial {trial_idx + 1}"]  # Initialize row with subject and trial info
 
                 print(trial_path)
                 for metric_name in metric_names:
-                    if isinstance(self.metric_config[metric_name], dict) and "ros_topic" in self.metric_config[metric_name]:
-                        # Single configuration (e.g., completion_time)
-                        config = self.metric_config[metric_name]
-                        metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-                        row.append("N/A")  # PSM is not applicable for single configuration metrics
-                        row.append(metric_result)
+                    config = self.metric_config[metric_name]
+
+                    if "files" in config:
+                        dfs = self.load_required_files(trial_path, config)
+                        if any(df is None for df in dfs.values()):
+                            print(f"Skipping {metric_name} for {trial_path}: missing files.")
+                            continue
+                        metric_result = metrics.compute_metric(metric_name, dfs, config)
+                        # Single config metrics have no PSM
+                        if isinstance(metric_result, float):
+                            row = [subject_name, f"Trial {trial_idx + 1}", "N/A", metric_name, metric_result]
+                            csv_data.append(row)
+                        elif isinstance(metric_result, dict):
+                            for domain, value in metric_result.items():
+                                row = [subject_name, f"Trial {trial_idx + 1}", "N/A", f"{metric_name}:{domain}", value]
+                                csv_data.append(row)
+                        else:
+                            raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_result)}")
                     else:
-                        # Multiple sub-configurations (e.g., average_speed_magnitude for PSMs)
-                        for psm, config in self.metric_config[metric_name].items():
-                            metric_result = metrics.compute_metric(metric_name, trial_data_frame, config)
-                            row.append(psm)
-                            row.append(metric_result)
+                        # multi-PSM config
+                        for psm_key, psm_config in config.items():
+                            dfs = self.load_required_files(trial_path, psm_config)
+                            if any(df is None for df in dfs.values()):
+                                print(f"Skipping {metric_name} for {trial_path} PSM {psm_key}: missing files.")
+                                continue
+                            metric_result = metrics.compute_metric(metric_name, dfs, psm_config)
+                            if isinstance(metric_result, float):
+                                row = [subject_name, f"Trial {trial_idx + 1}", psm_key, metric_name, metric_result]
+                                csv_data.append(row)
+                            elif isinstance(metric_result, dict):
+                                for domain, value in metric_result.items():
+                                    row = [subject_name, f"Trial {trial_idx + 1}", psm_key, f"{metric_name}:{domain}", value]
+                                    csv_data.append(row)
+                            else:
+                                raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_result)}")
 
-                csv_data.append(row)
-
-        # Write to CSV
         df = pd.DataFrame(csv_data, columns=header)
         df.to_csv(output_csv_path, index=False)
 
         print(f"All metrics saved to {output_csv_path}")
-
-
-
