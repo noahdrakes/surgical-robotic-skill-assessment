@@ -1,17 +1,16 @@
 {
     "completion_time": {
         "files": ["accel_left.parquet"],
-        "timestamp_col": "ts_ns",
-        "use_force_sensor": false
+        "timestamp_col": "ts_ns"
     },
     "average_speed_magnitude": {
         "PSM1": {
-            "files": ["PSM1measured_cp.parquet"],
-            "fields": ["pos_x", "pos_y", "pos_z"]
+            "files": ["PSM1bodymeasured_cv.parquet"],
+            "fields": ["linear_x", "linear_y", "linear_z"]
         },
         "PSM2": {
-            "files": ["PSM2measured_cp.parquet"],
-            "fields": ["pos_x", "pos_y", "pos_z"]
+            "files": ["PSM2bodymeasured_cv.parquet"],
+            "fields": ["linear_x", "linear_y", "linear_z"]
         }
     },
     "average_acceleration_magnitude": {
@@ -39,6 +38,27 @@
         "PSM2": {
             "files": ["PSM2bodymeasured_cv.parquet"],
             "velocity_fields": ["linear_x", "linear_y", "linear_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "average_force_magnitude": {
+        "ATIForceSensor": {
+            "files": ["ATImini40.parquet"],
+            "fields": ["force_x", "force_y", "force_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "total_path_length": {
+        "PSM1": {
+            "files": ["PSM1measured_cp.parquet"],
+            "fields": ["pos_x", "pos_y", "pos_z"],
+            "timestamp_col": "ts_ns"
+        },
+        "PSM2": {
+            "files": ["PSM1measured_cp.parquet"],
+            "fields": ["pos_x", "pos_y", "pos_z"],
             "timestamp_col": "ts_ns"
         }
     }

@@ -16,6 +16,8 @@ class Metrics:
             "average_speed_magnitude": self.compute_average_speed_magnitude,
             "average_acceleration_magnitude": self.compute_average_acceleration_magnitude,
             "average_jerk_magnitude": self.compute_average_jerk_magnitude,
+            "average_force_magnitude": self.compute_average_force_magnitude,
+            "total_path_length": self.compute_total_path_length
         }
 
     def compute_completion_time(self, dfs, config):
@@ -23,95 +25,26 @@ class Metrics:
         # For completion_time, expect single file, get first file's df
         trial_data = list(dfs.values())[0]
         timestamps = trial_data[config["timestamp_col"]]
-
-        if config["use_force_sensor"] == False:
-            return float(timestamps.iloc[-1] - timestamps.iloc[0])
         
-        ## CASE of when force sensor 
-        if config["use_force_sensor"] == True:
+        end_time = float (timestamps.iloc[-1] / 1e9)
+        start_time = float (timestamps.iloc[0] / 1e9)
 
-            force_z_field = config["ATImini40"]["fields"][2]  ## 2 is hardcoded for the z axis
-            force_z_data = trial_data[force_z_field] 
-
-            force_z_magnitude = 0
-            len_force_z_data = len(force_z_data)
-
-            print(len_force_z_data)
-            count = 0
-
-            ### FIRST FORCE IMPULSE ## 
-            while (count < len_force_z_data):
-
-                force_z_magnitude = force_z_data[count]
-
-                if force_z_magnitude < -2 :
-                    # print("mag: ", force_z_magnitude)
-                    break
-
-                count+=1
-    
-            index_of_first_button_press = count
-
-            ## first button press timestamp
-            first_button_press_timestamp = timestamps.iloc[index_of_first_button_press]
-
-            # checking the last button press within 20 seconds of the first button press
-            end_range = first_button_press_timestamp + 20
-
-            last_button_press_idx = 0
-
-            # print("index of first button press: ", index_of_first_button_press)
-            # print("first press timestamp: ", timestamps[index_of_first_button_press])
-
-            for i in range(index_of_first_button_press, len_force_z_data):
-
-                force_z_magnitude = force_z_data[i]
-
-                if force_z_magnitude < -2:
-                    last_button_press_idx = i
-
-                if timestamps.iloc[i] > end_range:
-                    break
-            
-            # print("timestamp of last button press: ", timestamps[last_button_press_idx])
-
-            # if (completion_time_count > 2):
-            #     while(1):
-            #         i =0
-            
-
-            count = len_force_z_data - 1
-            
-
-            ### LAST FORCE IMPULSE ###
-            low_magnitude_idx = None
-            while (count >= len_force_z_data - 2000):
-
-                force_z_magnitude = force_z_data[count]
-
-                if force_z_magnitude >= -.1 and force_z_magnitude <= .1 :
-                    # print("mag: ", force_z_magnitude)
-                    low_magnitude_idx = count
-                    break
-
-                count-=1
-            
-            print(low_magnitude_idx)
-
-            return float(timestamps.iloc[-1] - timestamps.iloc[last_button_press_idx])
+        return end_time - start_time
         
-    def compute_average_speed_magnitude(self, dfs, rostopic_config):
-        # dfs: dict of DataFrames, expect one file per rostopic_config
+    def compute_average_speed_magnitude(self, dfs, config):
         trial_data = list(dfs.values())[0]
-        speed_magnitude = 0
-        for field in rostopic_config["fields"]:
-            speed_avg = trial_data[field].mean()
-            speed_magnitude += pow(speed_avg, 2)
-        return float(math.sqrt(speed_magnitude))
+        # compute speed magnitude at each timestep
+        speed_sq = np.zeros(len(trial_data))
+        for field in config["fields"]:
+            speed_sq += trial_data[field] ** 2
+        speed_magnitude = np.sqrt(speed_sq)
+        return float(speed_magnitude.mean())
 
     def compute_average_acceleration_magnitude(self, dfs, config):
         # If using_accel is True and an accel file is present, use it
         if config["using_accel"] and len(dfs) > 1:
+            # using dataframe that contains the word accel in it to use the accelerometer signal to 
+            # do the calculation, as opposed to measured velocity
             accel_df = next((df for fname, df in dfs.items() if "accel" in fname.lower()), None)
             if accel_df is not None:
                 accel_sqrd = 0
@@ -124,23 +57,6 @@ class Metrics:
         trial_data = list(dfs.values())[0]
         timestamps = trial_data[config["timestamp_col"]]
         dt = np.diff(timestamps)
-        # DEBUG: Check for invalid dt values before using
-        invalid_mask = (np.isnan(dt) | np.isinf(dt) | (dt == 0))
-        if np.any(invalid_mask):
-            print(f"DEBUG for subject: {self.name}")
-            print(f"DEBUG files: {list(dfs.keys())}")
-            print("Any zeros in dt? ", np.any(dt == 0))
-            print("Any NaNs in dt?  ", np.any(np.isnan(dt)))
-            print("Any Infs in dt?  ", np.any(np.isinf(dt)))
-            print("dt stats: min =", np.nanmin(dt), "max =", np.nanmax(dt))
-            zero_indices = np.where(dt == 0)[0]
-            for idx in zero_indices:
-                ts1_ns = trial_data.iloc[idx]["ts_ns"]
-                ts2_ns = trial_data.iloc[idx+1]["ts_ns"]
-                print(f"Zero dt at index {idx}, ts_ns: {ts1_ns} and {ts2_ns}")
-            # Save the trial to debug.csv
-            debug_path = os.path.join(os.path.dirname(__file__), "..", "debug.csv")
-            trial_data.to_csv(debug_path, index=False)
         accel_sqrd = 0
         for field in config["velocity_fields"]:
             velocity = trial_data[field]
@@ -154,36 +70,40 @@ class Metrics:
         timestamps = trial_data[config["timestamp_col"]]
 
         dt = np.diff(timestamps)
-        # DEBUG: Check for invalid dt values before using
-        invalid_mask = (np.isnan(dt) | np.isinf(dt) | (dt == 0))
-        if np.any(invalid_mask):
-            print(f"DEBUG for subject: {self.name}")
-            print(f"DEBUG files: {list(dfs.keys())}")
-            print("Any zeros in dt? ", np.any(dt == 0))
-            print("Any NaNs in dt?  ", np.any(np.isnan(dt)))
-            print("Any Infs in dt?  ", np.any(np.isinf(dt)))
-            print("dt stats: min =", np.nanmin(dt), "max =", np.nanmax(dt))
-            zero_indices = np.where(dt == 0)[0]
-            for idx in zero_indices:
-                ts1_ns = trial_data.iloc[idx]["ts_ns"]
-                ts2_ns = trial_data.iloc[idx+1]["ts_ns"]
-                print(f"Zero dt at index {idx}, ts_ns: {ts1_ns} and {ts2_ns}")
-            # Save the trial to debug.csv
-            debug_path = os.path.join(os.path.dirname(__file__), "..", "debug.csv")
-            trial_data.to_csv(debug_path, index=False)
-            # return 1
         jerk_sqrd = 0
 
         for field in config["velocity_fields"]:
             velocity = trial_data[field]
             acceleration = np.diff(velocity) / dt
-            # print(acceleration)
             dt_accel = dt[1:]
             jerk = np.diff(acceleration) / dt_accel
             jerk_sqrd += np.mean(jerk**2)
         
         return float(math.sqrt(jerk_sqrd))
     
+    def compute_average_force_magnitude(self, dfs, config):
+        trial_data = list(dfs.values())[0]
+        # compute speed magnitude at each timestep
+        force_sq = np.zeros(len(trial_data))
+        for field in config["fields"]:
+            force_sq += trial_data[field] ** 2
+        force_magnitude = np.sqrt(force_sq)
+        return float(force_magnitude.mean())
+    
+    def compute_total_path_length(self, dfs, config):
+        trial_data = list(dfs.values())[0]
+
+        field_diff_sqred = np.zeros(len(trial_data) - 1)
+        for field in config["fields"]:
+            field_diff_sqred += np.diff(trial_data[field]) ** 2
+        
+        return float(np.sqrt(field_diff_sqred).sum())
+
+
+
+
+
+
     def compute_metric(self, metric_name, dfs, config):
         if metric_name not in self.metric_fns:
             raise ValueError(f"Metric '{metric_name}' is not supported.")
