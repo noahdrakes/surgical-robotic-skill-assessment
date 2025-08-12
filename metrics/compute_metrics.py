@@ -57,6 +57,9 @@ output_csv_path = "results.csv"
 
 print("exporting to csv")
 
-metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", "average_force_magnitude", "total_path_length"]
+metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", 
+                "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
+                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion"]
+
 manager.export_metrics_to_csv(metric_names, output_csv_path)
 print("finished")

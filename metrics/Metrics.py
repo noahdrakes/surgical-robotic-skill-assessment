@@ -8,6 +8,8 @@ import os
 completion_time_count = 0
 
 class Metrics:
+
+    
     def __init__(self, subject, num_trials):
         self.name = subject
         self.num_trials = num_trials
@@ -17,7 +19,14 @@ class Metrics:
             "average_acceleration_magnitude": self.compute_average_acceleration_magnitude,
             "average_jerk_magnitude": self.compute_average_jerk_magnitude,
             "average_force_magnitude": self.compute_average_force_magnitude,
-            "total_path_length": self.compute_total_path_length
+            "total_path_length": self.compute_total_path_length,
+            "average_angular_speed_magnitude": self.compute_average_angular_speed_magnitude,
+            "speed_correlation": self.compute_speed_correlation,
+            "speed_cross": self.compute_speed_cross,
+            "acceleration_cross": self.compute_acceleration_cross,
+            "jerk_cross": self.compute_jerk_cross,
+            "acceleration_dispertion": self.compute_accel_dispertion,
+            "jerk_dispertion": self.compute_jerk_dispertion
         }
 
     def compute_completion_time(self, dfs, config):
@@ -47,10 +56,14 @@ class Metrics:
             # do the calculation, as opposed to measured velocity
             accel_df = next((df for fname, df in dfs.items() if "accel" in fname.lower()), None)
             if accel_df is not None:
-                accel_sqrd = 0
-                for field in config["acceleration_fields"]:
-                    acceleration = accel_df[field]
-                    accel_sqrd += pow(acceleration.mean(), 2)
+                # accel_sqrd = 0
+                # for field in config["acceleration_fields"]:
+                #     acceleration = accel_df[field]
+                #     accel_sqrd += pow(acceleration.mean(), 2)
+                accel_mag = self.__compute_magnitude(accel_df, config, "acceleration_fields")
+                return np.mean(accel_mag)
+
+
                 return float(math.sqrt(accel_sqrd))
 
         # Otherwise compute acceleration from velocity
@@ -98,10 +111,195 @@ class Metrics:
             field_diff_sqred += np.diff(trial_data[field]) ** 2
         
         return float(np.sqrt(field_diff_sqred).sum())
+    
+    def compute_average_angular_speed_magnitude(self, dfs, config):
+        trial_data = list(dfs.values())[0]
+        # compute speed magnitude at each timestep
+        speed_sq = np.zeros(len(trial_data))
+        for field in config["fields"]:
+            speed_sq += trial_data[field] ** 2
+        speed_magnitude = np.sqrt(speed_sq)
+        return float(speed_magnitude.mean())
+
+    def compute_speed_correlation(self, dfs, config):
+        PSMa_speed, PSMb_speed = list(dfs.values())
+
+        n = len(PSMa_speed) if (len(PSMa_speed) < len(PSMb_speed)) else len(PSMb_speed)
+
+        PSMa_speed = PSMa_speed[:n]
+        PSMb_speed = PSMb_speed[:n]
+
+        PSMa_speed_magnitude = self.__compute_magnitude(PSMa_speed, config, "fields")
+        PSMb_speed_magnitude = self.__compute_magnitude(PSMb_speed, config, "fields")
+
+        r = np.corrcoef(PSMa_speed_magnitude, PSMb_speed_magnitude)[0][1]
+
+        return r
+    
+    def __compute_magnitude(self, df, config, fields):
+        sq = np.zeros(len(df))
+        for field in config[fields]:
+            sq += df[field] ** 2
+        df_magnitude = np.sqrt(sq)
+        return df_magnitude
+
+    
+    def __cross(self, x, y):
+        if len(x) != len(y):
+            print("[ERROR: __cross fn], arrays have mismatched lengths")
+            return None
+        
+        xmin = x[0]
+        ymin = y[0]
+
+        xmin_upper = 0
+        ymin_upper = 0
+
+        xmin_upper += np.abs(xmin) * 1.05
+        ymin_upper += np.abs(ymin) * 1.05
+
+        # print("xmin: ", xmin, " xmin_upper: ", xmin_upper)
+        # print("ymin: ", ymin, " ymin_upper: ", ymin_upper)
+
+        x = np.asarray(x).astype(np.float64)
+        y = np.asarray(y).astype(np.float64)
+
+        counter = 0
+
+        for i in range(len(x)):
+            if x[i] >= xmin and x[i] < xmin_upper and y[i] >= ymin and y[i] < ymin_upper:
+                counter += 1
+        
+        return float(counter) / float(len(x))
 
 
+    def compute_speed_cross(self, dfs, config):
+        PSMa_speed, PSMb_speed = list(dfs.values())
+
+        n = len(PSMa_speed) if (len(PSMa_speed) < len(PSMb_speed)) else len(PSMb_speed)
+
+        PSMa_speed = PSMa_speed[:n]
+        PSMb_speed = PSMb_speed[:n]
+
+        PSMa_speed_magnitude = self.__compute_magnitude(PSMa_speed, config,"fields")
+        PSMb_speed_magnitude = self.__compute_magnitude(PSMb_speed, config, "fields")
+
+        cross = self.__cross(PSMa_speed_magnitude, PSMb_speed_magnitude)
+        # cross = self.__cross(linearx_a, linearx_b)
+        return cross
+    
+    def compute_acceleration_cross(self, dfs, config):
+        PSMa_accel, PSMb_accel = list(dfs.values())
+
+        n = len(PSMa_accel) if (len(PSMa_accel) < len(PSMb_accel)) else len(PSMb_accel)
+
+        PSMa_accel = PSMa_accel[:n]
+        PSMb_accel = PSMb_accel[:n]
+
+        PSMa_accel_magnitude = self.__compute_magnitude(PSMa_accel, config, "fields")
+        PSMb_accel_magnitude = self.__compute_magnitude(PSMb_accel, config, "fields")
+
+        cross = self.__cross(PSMa_accel_magnitude, PSMb_accel_magnitude)
+        
+        # return np.mean(PSMa_accel_magnitude)
+        return cross
 
 
+    def compute_jerk_cross(self, dfs, config):
+        PSMa_vel, PSMb_vel = list(dfs.values())
+
+        n = len(PSMa_vel) if (len(PSMa_vel) < len(PSMb_vel)) else len(PSMb_vel)
+
+        PSMa_vel = PSMa_vel[:n]
+        PSMb_vel = PSMb_vel[:n]
+
+        ts_col = config["timestamp_col"]
+        timestamps_a = PSMa_vel[ts_col].values
+        timestamps_b = PSMb_vel[ts_col].values
+
+        dt_a = np.diff(timestamps_a)
+        dt_b = np.diff(timestamps_b)
+
+        jerk_sqrd_a = np.zeros(n-2)
+        jerk_sqrd_b = np.zeros(n-2)
+
+        for field in config["fields"]:
+            velocity = PSMa_vel[field]
+            acceleration = np.diff(velocity) / dt_a
+            dt_accel = dt_a[1:]
+            jerk = np.diff(acceleration) / dt_accel
+            jerk_sqrd_a += np.square(jerk)
+        
+        jerk_magnitude_a = np.sqrt(jerk_sqrd_a)
+
+        for field in config["fields"]:
+            velocity = PSMb_vel[field]
+            acceleration = np.diff(velocity) / dt_b
+            dt_accel = dt_b[1:]
+            jerk = np.diff(acceleration) / dt_accel
+            jerk_sqrd_b += np.square(jerk)
+        
+        jerk_magnitude_b = np.sqrt(jerk_sqrd_b)
+
+        cross = self.__cross(jerk_magnitude_a, jerk_magnitude_b)
+        return cross
+
+    def compute_accel_dispertion(self, dfs, config):
+        PSMa_accel, PSMb_accel = list(dfs.values())
+
+        n = len(PSMa_accel) if (len(PSMa_accel) < len(PSMb_accel)) else len(PSMb_accel)
+
+        PSMa_accel = PSMa_accel[:n]
+        PSMb_accel = PSMb_accel[:n]
+
+        PSMa_accel_magnitude = self.__compute_magnitude(PSMa_accel, config, "fields")
+        PSMb_accel_magnitude = self.__compute_magnitude(PSMb_accel, config, "fields")
+
+        PSMa_accel_std = np.std(PSMa_accel_magnitude)
+        PSMb_accel_std = np.std(PSMb_accel_magnitude)
+
+        return np.abs ((PSMa_accel_std - PSMb_accel_std)/(PSMa_accel_std + PSMb_accel_std))
+    
+    def compute_jerk_dispertion(self, dfs, config):
+        PSMa_vel, PSMb_vel = list(dfs.values())
+
+        n = len(PSMa_vel) if (len(PSMa_vel) < len(PSMb_vel)) else len(PSMb_vel)
+
+        PSMa_vel = PSMa_vel[:n]
+        PSMb_vel = PSMb_vel[:n]
+
+        ts_col = config["timestamp_col"]
+        timestamps_a = PSMa_vel[ts_col].values
+        timestamps_b = PSMb_vel[ts_col].values
+
+        dt_a = np.diff(timestamps_a)
+        dt_b = np.diff(timestamps_b)
+
+        jerk_sqrd_a = np.zeros(n-2)
+        jerk_sqrd_b = np.zeros(n-2)
+
+        for field in config["fields"]:
+            velocity = PSMa_vel[field]
+            acceleration = np.diff(velocity) / dt_a
+            dt_accel = dt_a[1:]
+            jerk = np.diff(acceleration) / dt_accel
+            jerk_sqrd_a += np.square(jerk)
+        
+        jerk_magnitude_a = np.sqrt(jerk_sqrd_a)
+
+        for field in config["fields"]:
+            velocity = PSMb_vel[field]
+            acceleration = np.diff(velocity) / dt_b
+            dt_accel = dt_b[1:]
+            jerk = np.diff(acceleration) / dt_accel
+            jerk_sqrd_b += np.square(jerk)
+        
+        jerk_magnitude_b = np.sqrt(jerk_sqrd_b)
+
+        PSMa_jerk_std = np.std(jerk_magnitude_a)
+        PSMb_jerk_std = np.std(jerk_magnitude_b)
+
+        return np.abs( (PSMa_jerk_std - PSMb_jerk_std) / (PSMa_jerk_std + PSMb_jerk_std))
 
 
     def compute_metric(self, metric_name, dfs, config):

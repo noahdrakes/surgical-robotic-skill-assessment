@@ -16,7 +16,7 @@
     "average_acceleration_magnitude": {
         "PSM1": {
             "files": ["PSM1measured_cp.parquet", "accel_left.parquet"],
-            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "fields": ["vel_x", "vel_y", "vel_z"],
             "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
             "timestamp_col": "ts_ns",
             "using_accel": true
@@ -59,6 +59,67 @@
         "PSM2": {
             "files": ["PSM1measured_cp.parquet"],
             "fields": ["pos_x", "pos_y", "pos_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "average_angular_speed_magnitude":{
+        "PSM1": {
+            "files": ["PSM1bodymeasured_cv.parquet"],
+            "fields": ["angular_x", "angular_y", "angular_z"],
+            "timestamp_col": "ts_ns"
+        },
+        "PSM2": {
+            "files": ["PSM2bodymeasured_cv.parquet"],
+            "fields": ["angular_x", "angular_y", "angular_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "speed_correlation":{
+        "PSM1_PSM2": {
+            "files": ["PSM1bodymeasured_cv.parquet", "PSM2bodymeasured_cv.parquet"],
+            "fields": ["angular_x", "angular_y", "angular_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "speed_cross":{
+        "PSM1_PSM2": {
+            "files": ["PSM1bodymeasured_cv.parquet", "PSM2bodymeasured_cv.parquet"],
+            "fields": ["angular_x", "angular_y", "angular_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "acceleration_cross":{
+        "PSM1_PSM2": {
+            "files": ["accel_left.parquet", "accel_right.parquet"],
+            "fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "jerk_cross": {
+        "PSM1_PSM2": {
+            "files": ["PSM1bodymeasured_cv.parquet", "PSM2bodymeasured_cv.parquet"],
+            "fields": ["linear_x", "linear_y", "linear_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "acceleration_dispertion": {
+        "PSM1_PSM2": {
+            "files": ["accel_left.parquet", "accel_right.parquet"],
+            "fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "jerk_dispertion": {
+        "PSM1_PSM2": {
+            "files": ["PSM1bodymeasured_cv.parquet", "PSM2bodymeasured_cv.parquet"],
+            "fields": ["linear_x", "linear_y", "linear_z"],
             "timestamp_col": "ts_ns"
         }
     }
