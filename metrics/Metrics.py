@@ -510,3 +510,114 @@ class MetricsManager:
         df.to_csv(output_csv_path, index=False)
 
         print(f"All metrics saved to {output_csv_path}")
+
+
+    def __return_csv_header_ml(self, metric_names):
+        csv_data = []
+        # For multi-PSM, header should allow for PSM column plus metric columns
+        # But since metrics may vary in structure, keep simple header with variable length rows
+        # We'll output: Subject, Trial, PSM, Metric, Value for each metric result row
+
+        header = ["Subject_Trial"]
+
+        for subject_name, subject_data in self.subjects.items():
+            print(subject_name)
+            trial_paths = subject_data["trial_paths"]
+            metrics = subject_data["metrics"]
+
+            for trial_idx, trial_path in enumerate(trial_paths):
+
+                for metric_name in metric_names:
+                    config = self.metric_config[metric_name]
+
+                    if "files" in config:
+                        dfs = self.load_required_files(trial_path, config)
+                        if any(df is None for df in dfs.values()):
+                            continue
+                        metric_result = metrics.compute_metric(metric_name, dfs, config)
+                        # Single config metrics have no PSM
+                        if isinstance(metric_result, float):
+                            header.append(metric_name)
+                        elif isinstance(metric_result, dict):
+                            for domain, value in metric_result.items():
+                                header.append(domain + "_" + metric_name)
+                        else:
+                            raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_result)}")
+                    else:
+                        # multi-PSM config
+                        for psm_key, psm_config in config.items():
+                            if isinstance(metric_result, float):
+                                header.append(psm_key + "_" + metric_name)
+                            elif isinstance(metric_result, dict):
+                                for domain, value in metric_result.items():
+                                    header.append(domain + "_", metric_name)
+                            else:
+                                raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_result)}")
+                break ## these break statements are such bad software engineering 
+            break
+        return header
+
+
+    def export_metrics_to_csv_ml(self, metric_names, output_csv_path):
+
+        csv_data = []
+        header = self.__return_csv_header_ml(metric_names)
+        ## write header
+
+        row_data = []
+        dataframe = []
+
+        for subject_name, subject_data in self.subjects.items():
+            trial_paths = subject_data["trial_paths"]
+            metrics = subject_data["metrics"]
+
+            for trial_idx, trial_path in enumerate(trial_paths):
+
+                print(subject_name)
+                print(trial_path)
+
+                row_data.append(subject_name + "_" + str(trial_idx))
+
+                for metric_name in metric_names:
+                    config = self.metric_config[metric_name]
+
+                    if "files" in config:
+                        dfs = self.load_required_files(trial_path, config)
+                        if any(df is None for df in dfs.values()):
+                            print(f"Skipping {metric_name} for {trial_path}: missing files.")
+                            continue
+                        metric_results = metrics.compute_metric(metric_name, dfs, config)
+
+                        # Handle single-value metrics (e.g., completion_time)
+                        if isinstance(metric_results, float):
+                            row_data.append(metric_results)
+                        # Handle multi-value metrics (e.g., average_speed_magnitude)
+                        elif isinstance(metric_results, dict):
+                            for domain, value in metric_results.items():
+                                row_data.append(metric_results)
+                        else:
+                            raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_results)}")
+                    else:
+                        # multi-PSM config
+                        for psm_key, psm_config in config.items():
+                            dfs = self.load_required_files(trial_path, psm_config)
+                            if any(df is None for df in dfs.values()):
+                                print(f"Skipping {metric_name} for {trial_path} PSM {psm_key}: missing files.")
+                                continue
+                            metric_results = metrics.compute_metric(metric_name, dfs, psm_config)
+
+                            # For multi-PSM metrics, flatten results by PSM
+                            if isinstance(metric_results, float):
+                                row_data.append(metric_results)
+                            elif isinstance(metric_results, dict):
+                                for domain, value in metric_results.items():
+                                    row_data.append(value)
+                            else:
+                                raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_results)}")
+                dataframe.append(row_data)
+                row_data = []
+                
+        df = pd.DataFrame(dataframe, columns=header)
+        df.to_csv(output_csv_path, index=False)
+
+        print(f"Metrics saved to {output_csv_path}")

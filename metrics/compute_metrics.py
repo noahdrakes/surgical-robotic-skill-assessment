@@ -61,5 +61,7 @@ metric_names = ["completion_time", "average_speed_magnitude", "average_accelerat
                 "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
                 "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion"]
 
-manager.export_metrics_to_csv(metric_names, output_csv_path)
+# manager.return_csv_header_ml(metric_names)
+# exit()
+manager.export_metrics_to_csv_ml(metric_names, output_csv_path)
 print("finished")
