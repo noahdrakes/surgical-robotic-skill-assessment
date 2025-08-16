@@ -57,7 +57,7 @@
             "timestamp_col": "ts_ns"
         },
         "PSM2": {
-            "files": ["PSM1measured_cp.parquet"],
+            "files": ["PSM2measured_cp.parquet"],
             "fields": ["pos_x", "pos_y", "pos_z"],
             "timestamp_col": "ts_ns"
         }
