@@ -149,16 +149,7 @@ def main():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_epoch = epoch
-            torch.save({
-                "epoch": epoch,
-                "model_state": model.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-                "meta": {
-                    "n_features": train_ds.n_features,
-                    "n_classes": train_ds.n_classes,
-                },
-                "args": vars(args),
-            }, ckpt_path)
+            torch.save({"epoch": epoch,"model_state": model.state_dict(),"optimizer_state": optimizer.state_dict(),"meta": {"n_features": train_ds.n_features,"n_classes": train_ds.n_classes,},"args": vars(args),}, ckpt_path)
 
     print(f"Best epoch: {best_epoch}  | best_val_loss: {best_val_loss:.4f}\nSaved: {ckpt_path}")
 

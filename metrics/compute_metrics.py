@@ -48,7 +48,7 @@ manager = MetricsManager(config_path="metric_config.json")
 
 print("adding all subjects")
 
-path_to_data = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data"
+path_to_data = "/home/ndrakes1/surgical_skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data"
 add_all_subjects(manager, path_to_data)
 
 print("subjects added")
@@ -63,5 +63,6 @@ metric_names = ["completion_time", "average_speed_magnitude", "average_accelerat
 
 # manager.return_csv_header_ml(metric_names)
 # exit()
-manager.export_metrics_to_csv_ml(metric_names, output_csv_path)
+manager.export_metrics_to_csv_ml(metric_names, "results_ml.csv")
+manager.export_metrics_to_csv(metric_names, "results.csv")
 print("finished")
