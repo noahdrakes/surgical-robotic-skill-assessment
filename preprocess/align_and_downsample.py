@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 from preprocess import find_subject_files
+from trial_valid import is_trial_valid
 from tqdm import tqdm
 import shutil
 import json
@@ -347,6 +348,12 @@ for subject_dir in subject_dirs:
     pbar.total = len(trial_dirs)
 
     for trial_count, trial_dir in enumerate(trial_dirs):
+
+        valid_trials_csv = "/Users/noahdrakes/Documents/research/skill_assessment/MISTIC_robotic_suturing_study/protocol/trial_inclusion_matrix.csv"
+
+        if is_trial_valid(valid_trials_csv, subject_dir, trial_dir) != True:
+            print("SKIPPING INVALID TRIAL")
+            continue
 
         # Gather Parquet files for the trial, filtering unwanted files
         parquet_files = [
