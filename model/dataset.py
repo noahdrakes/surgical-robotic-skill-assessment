@@ -3,6 +3,28 @@ from torch.utils.data import Dataset
 import pandas as pd
 
 class MetricsMLPDataset(Dataset):
+    DEFAULT_FEATURES = [
+        "completion_time",
+        "PSM1_average_speed_magnitude",
+        "PSM2_average_speed_magnitude",
+        "PSM1_average_acceleration_magnitude",
+        "PSM2_average_acceleration_magnitude",
+        "PSM1_average_jerk_magnitude",
+        "PSM2_average_jerk_magnitude",
+        "ATIForceSensor_average_force_magnitude",
+        "PSM1_total_path_length",
+        "PSM2_total_path_length",
+        "PSM1_average_angular_speed_magnitude",
+        "PSM2_average_angular_speed_magnitude",
+        "PSM1_PSM2_speed_correlation",
+        "PSM1_PSM2_speed_cross",
+        "PSM1_PSM2_acceleration_cross",
+        "PSM1_PSM2_jerk_cross",
+        "PSM1_PSM2_acceleration_dispertion",
+        "PSM1_PSM2_jerk_dispertion",
+        "PSM1_forcen_magnitude",
+        "PSM2_forcen_magnitude",
+    ]
     """
     CSV layout (per row):
         [trial_id, f1, f2, ..., fN, label]
@@ -18,6 +40,10 @@ class MetricsMLPDataset(Dataset):
         csv_path: str,
         label_order=("NOVICE", "INTERMEDIATE", "EXPERT"),
         x_dtype: torch.dtype = torch.float32,
+        norm_mean: torch.Tensor | None = None,
+        norm_std: torch.Tensor | None = None,
+        normalize: bool = True,
+        features: list[str] | None = None,
     ):
         # Read CSV
         df = pd.read_csv(csv_path)
@@ -27,9 +53,28 @@ class MetricsMLPDataset(Dataset):
         # Keep trial IDs (optional, useful for analysis)
         self.trial_ids = df.iloc[:, 0].astype(str).tolist()
 
-        # Features are all middle columns
-        feature_df = df.iloc[:, 1:-1]
+        # Decide which features to use
+        if features is None:
+            features = self.DEFAULT_FEATURES
+        # Validate that all chosen features are present in df.columns
+        missing = [f for f in features if f not in df.columns]
+        if missing:
+            raise ValueError(f"Features not found in CSV columns: {missing}")
+        feature_df = df[features]
         self.X = torch.tensor(feature_df.values, dtype=x_dtype)
+
+        # Compute mean and std along dataset (dim=0: column-wise), or use provided stats
+        if norm_mean is None or norm_std is None:
+            self.feature_mean = self.X.mean(dim=0)
+            self.feature_std = self.X.std(dim=0)
+        else:
+            self.feature_mean = norm_mean
+            self.feature_std = norm_std
+
+        # Clamp std for numerical safety
+        self._std_safe = torch.clamp(self.feature_std, min=1e-12)
+
+        self.normalize = normalize
 
         # Labels: last column -> class indices according to label_order
         raw_labels = (df.iloc[:, -1].astype(str))
@@ -48,15 +93,11 @@ class MetricsMLPDataset(Dataset):
         return self.X.shape[0]
 
     def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
-    
-# from torch.utils.data import DataLoader
+        if self.normalize:
+            return (self.X[idx] - self.feature_mean) / self._std_safe, self.y[idx]
+        else:
+            return self.X[idx], self.y[idx]
 
-# ds = MetricsMLPDataset("../metrics/results.csv")
-# loader = DataLoader(ds, batch_size=256, shuffle=True)
-
-# for xb, yb in loader:
-#     # train step
-#     print("FEATS: ", xb)
-#     print("LABEL: ", yb)
-#     pass
+# Example usage:
+# train_ds = MetricsMLPDataset("train.csv", normalize=True)
+# val_ds = MetricsMLPDataset("val.csv", normalize=True, norm_mean=train_ds.feature_mean, norm_std=train_ds.feature_std)

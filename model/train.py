@@ -1,5 +1,3 @@
-
-
 import argparse
 import os
 import random
@@ -89,13 +87,41 @@ def main():
                         help="Path to training CSV: [trial_id | features... | label]")
     parser.add_argument("--val_csv", type=str, required=True,
                         help="Path to validation CSV: same format as train")
+    
+    # FEATURES = [
+    #     "completion_time",
+    #     "PSM1_average_speed_magnitude",
+    #     "PSM2_average_speed_magnitude",
+    #     "PSM1_average_acceleration_magnitude",
+    #     "PSM2_average_acceleration_magnitude",
+    #     "PSM1_average_jerk_magnitude",
+    #     "PSM2_average_jerk_magnitude",
+    #     "ATIForceSensor_average_force_magnitude",
+    #     "PSM1_total_path_length",
+    #     "PSM2_total_path_length",
+    #     "PSM1_average_angular_speed_magnitude",
+    #     "PSM2_average_angular_speed_magnitude",
+    #     "PSM1_PSM2_speed_correlation",
+    #     "PSM1_PSM2_speed_cross",
+    #     "PSM1_PSM2_acceleration_cross",
+    #     "PSM1_PSM2_jerk_cross",
+    #     "PSM1_PSM2_acceleration_dispertion",
+    #     "PSM1_PSM2_jerk_dispertion",
+    #     "PSM1_forcen_magnitude",
+    #     "PSM2_forcen_magnitude"
+    # ]
+    FEATURES = [
+        "ATIForceSensor_average_force_magnitude",
+        "PSM1_forcen_magnitude",
+        "PSM2_forcen_magnitude"
+    ]
 
     # Model
-    parser.add_argument("--hidden1", type=int, default=256)
-    parser.add_argument("--hidden2", type=int, default=128)
+    parser.add_argument("--hidden1", type=int, default=64)
+    parser.add_argument("--hidden2", type=int, default=32)
 
     # Optimization
-    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--epochs", type=int, default=500)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
@@ -111,8 +137,8 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     # Datasets / Loaders
-    train_ds = MetricsMLPDataset(args.train_csv)
-    val_ds   = MetricsMLPDataset(args.val_csv)
+    train_ds = MetricsMLPDataset(args.train_csv, normalize=True, features=FEATURES)
+    val_ds   = MetricsMLPDataset(args.val_csv, normalize=True, norm_mean=train_ds.feature_mean, norm_std=train_ds.feature_std, features=FEATURES)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
@@ -125,7 +151,7 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5)
 
     best_val_loss = float("inf")
     best_epoch = -1

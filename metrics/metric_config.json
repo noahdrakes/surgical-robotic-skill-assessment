@@ -122,5 +122,32 @@
             "fields": ["linear_x", "linear_y", "linear_z"],
             "timestamp_col": "ts_ns"
         }
+    },
+    "acceleration_nT": {
+        "PSM1": {
+            "files": ["PSM1measured_cp.parquet", "accel_left.parquet"],
+            "fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        },
+        "PSM2": {
+            "files": ["PSM2measured_cp.parquet", "accel_right.parquet"],
+            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        }
+    },
+
+    "forcen_magnitude": {
+        "PSM1": {
+            "files": ["forcen_left.parquet"],
+            "fields": ["force_x", "force_y"]
+        },
+        "PSM2": {
+            "files": ["forcen_right.parquet"],
+            "fields": ["force_x", "force_y"]
+        }
     }
 }

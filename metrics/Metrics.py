@@ -4,6 +4,7 @@ import csv
 import json
 import pandas as pd
 import os
+from tqdm import tqdm
 
 completion_time_count = 0
 
@@ -26,7 +27,9 @@ class Metrics:
             "acceleration_cross": self.compute_acceleration_cross,
             "jerk_cross": self.compute_jerk_cross,
             "acceleration_dispertion": self.compute_accel_dispertion,
-            "jerk_dispertion": self.compute_jerk_dispertion
+            "jerk_dispertion": self.compute_jerk_dispertion,
+            "forcen_magnitude": self.compute_forcen_magnitude,
+            # "acceleration_nT": self.compute_acceleration_nT
         }
 
     def compute_completion_time(self, dfs, config):
@@ -300,7 +303,23 @@ class Metrics:
         PSMb_jerk_std = np.std(jerk_magnitude_b)
 
         return np.abs( (PSMa_jerk_std - PSMb_jerk_std) / (PSMa_jerk_std + PSMb_jerk_std))
+    
+    def compute_forcen_magnitude(self, dfs, config):
 
+        trial_data = list(dfs.values())[0]
+        # compute speed magnitude at each timestep
+        forcen_sq = np.zeros(len(trial_data))
+        for field in config["fields"]:
+            forcen_sq += trial_data[field] ** 2
+        forcen_magnitude = np.sqrt(forcen_sq)
+        return float(forcen_magnitude.mean())
+
+
+    ## nT = normalized by Time 
+    ## nPL = normalized by Path Length
+    # def compute_acceleration_nT(self, dfs, config):
+    #     avg_acceleration_magnitude = self.compute_average_speed_magnitude(dfs, config)
+    #     total_time = 
 
     def compute_metric(self, metric_name, dfs, config):
         if metric_name not in self.metric_fns:
@@ -315,6 +334,9 @@ class Metrics:
         for psm_key, psm_config in config.items():
             results[psm_key] = compute_fn(dfs, psm_config)
         return results
+
+    
+
 
 
 class MetricsManager:
@@ -346,6 +368,42 @@ class MetricsManager:
                 key: {f: self.load_parquet(trial_path, f) for f in subcfg["files"]}
                 for key, subcfg in config.items()
             }
+        
+    def find_subject_files(self, path_to_data):
+        return [f for f in os.listdir(path_to_data) if not f.startswith('.')]
+
+
+    def add_all_subjects(self, manager, path_to_data):
+        
+        # Grabbing all of the subject directories
+        subject_dirs = self.find_subject_files(path_to_data)
+
+        print("Adding all Subjects...")
+
+        # Iterating through each subject
+        for subject_dir in subject_dirs:
+
+            # Progress Bar for Preprocess
+            pbar = tqdm(desc="Subject " + subject_dir)
+
+            subject_path = os.path.join(path_to_data, subject_dir)
+
+            # Loading all trial directories (directories like T01, T02, etc.)
+            subject_trials = [os.path.join(subject_path, f) for f in os.listdir(subject_path) if os.path.isdir(os.path.join(subject_path, f))]
+
+            num_trials = len(subject_trials)
+            pbar.total = num_trials
+
+            manager.add_subject(subject_dir, num_trials)
+
+            for subject_trial in subject_trials:
+
+                if os.path.splitext(subject_trial)[1] == ".txt":
+                    continue
+
+                manager.add_trial_path(subject_dir, subject_trial)
+
+                pbar.update()
 
     def compute_metric_for_subject(self, subject_name, metric_name, psms=None):
         if subject_name not in self.subjects:
@@ -520,41 +578,22 @@ class MetricsManager:
 
         header = ["Subject_Trial"]
 
-        for subject_name, subject_data in self.subjects.items():
-            print(subject_name)
-            trial_paths = subject_data["trial_paths"]
-            metrics = subject_data["metrics"]
+        # --- PATCH FIX START ---
+        # Original code only built headers for the *first subject* and *first trial*,
+        # then broke out of the loop early.
+        # That caused only ~6 trials to export properly.
+        #
+        # Instead, we now just build the header by iterating over all metric_names directly.
+        for metric_name in metric_names:
+            config = self.metric_config[metric_name]
 
-            for trial_idx, trial_path in enumerate(trial_paths):
+            if "files" in config:
+                header.append(metric_name)
+            else:
+                for psm_key, psm_config in config.items():
+                    header.append(f"{psm_key}_{metric_name}")
+        # --- PATCH FIX END ---
 
-                for metric_name in metric_names:
-                    config = self.metric_config[metric_name]
-
-                    if "files" in config:
-                        dfs = self.load_required_files(trial_path, config)
-                        if any(df is None for df in dfs.values()):
-                            continue
-                        metric_result = metrics.compute_metric(metric_name, dfs, config)
-                        # Single config metrics have no PSM
-                        if isinstance(metric_result, float):
-                            header.append(metric_name)
-                        elif isinstance(metric_result, dict):
-                            for domain, value in metric_result.items():
-                                header.append(domain + "_" + metric_name)
-                        else:
-                            raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_result)}")
-                    else:
-                        # multi-PSM config
-                        for psm_key, psm_config in config.items():
-                            if isinstance(metric_result, float):
-                                header.append(psm_key + "_" + metric_name)
-                            elif isinstance(metric_result, dict):
-                                for domain, value in metric_result.items():
-                                    header.append(domain + "_", metric_name)
-                            else:
-                                raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_result)}")
-                break ## these break statements are such bad software engineering 
-            break
         return header
 
 
@@ -562,7 +601,6 @@ class MetricsManager:
 
         csv_data = []
         header = self.__return_csv_header_ml(metric_names)
-        ## write header
 
         row_data = []
         dataframe = []
@@ -571,12 +609,12 @@ class MetricsManager:
             trial_paths = subject_data["trial_paths"]
             metrics = subject_data["metrics"]
 
-            for trial_idx, trial_path in enumerate(trial_paths):
-
+            for trial_path in trial_paths:
                 print(subject_name)
                 print(trial_path)
 
-                row_data.append(subject_name + "_" + str(trial_idx))
+                trial_id = os.path.basename(trial_path)  # --- PATCH: use real trial ID instead of fake index ---
+                row_data.append(f"{subject_name}_{trial_id}")
 
                 for metric_name in metric_names:
                     config = self.metric_config[metric_name]
@@ -588,13 +626,11 @@ class MetricsManager:
                             continue
                         metric_results = metrics.compute_metric(metric_name, dfs, config)
 
-                        # Handle single-value metrics (e.g., completion_time)
                         if isinstance(metric_results, float):
                             row_data.append(metric_results)
-                        # Handle multi-value metrics (e.g., average_speed_magnitude)
                         elif isinstance(metric_results, dict):
                             for domain, value in metric_results.items():
-                                row_data.append(metric_results)
+                                row_data.append(value)
                         else:
                             raise ValueError(f"Unsupported metric result type for '{metric_name}': {type(metric_results)}")
                     else:
@@ -606,7 +642,6 @@ class MetricsManager:
                                 continue
                             metric_results = metrics.compute_metric(metric_name, dfs, psm_config)
 
-                            # For multi-PSM metrics, flatten results by PSM
                             if isinstance(metric_results, float):
                                 row_data.append(metric_results)
                             elif isinstance(metric_results, dict):
@@ -616,7 +651,7 @@ class MetricsManager:
                                 raise ValueError(f"Unsupported metric result type for '{metric_name}' PSM '{psm_key}': {type(metric_results)}")
                 dataframe.append(row_data)
                 row_data = []
-                
+
         df = pd.DataFrame(dataframe, columns=header)
         df.to_csv(output_csv_path, index=False)
 

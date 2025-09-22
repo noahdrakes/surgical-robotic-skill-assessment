@@ -30,7 +30,7 @@ def concatenate_labels(path_to_labels, path_to_metrics):
     metrics_df.to_csv(path_to_metrics, index=False)
 
 
-concatenate_labels("/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/labels/labels.csv","/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/metrics/results.csv")
+concatenate_labels("~/surgical_skill_assessment/surgical-robotic-skill-assessment/labels/labels.csv","~/surgical_skill_assessment/surgical-robotic-skill-assessment/metrics/results_ml_force.csv")
 
 
 

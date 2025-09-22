@@ -3,53 +3,22 @@ import pandas as pd
 import math
 import argparse
 import shutil
-from tqdm import tqdm
 from pprint import pprint
 from Metrics import Metrics, MetricsManager
 
-def find_subject_files(path_to_data):
-    return [f for f in os.listdir(path_to_data) if not f.startswith('.')]
 
-
-def add_all_subjects(manager, path_to_data):
-    
-    # Grabbing all of the subject directories
-    subject_dirs = find_subject_files(path_to_data)
-
-    print("Adding all Subjects...")
-
-    # Iterating through each subject
-    for subject_dir in subject_dirs:
-
-        # Progress Bar for Preprocess
-        pbar = tqdm(desc="Subject " + subject_dir)
-
-        subject_path = os.path.join(path_to_data, subject_dir)
-
-        # Loading all trial directories (directories like T01, T02, etc.)
-        subject_trials = [os.path.join(subject_path, f) for f in os.listdir(subject_path) if os.path.isdir(os.path.join(subject_path, f))]
-
-        num_trials = len(subject_trials)
-        pbar.total = num_trials
-
-        manager.add_subject(subject_dir, num_trials)
-
-        for subject_trial in subject_trials:
-
-            if os.path.splitext(subject_trial)[1] == ".txt":
-                continue
-
-            manager.add_trial_path(subject_dir, subject_trial)
-
-            pbar.update()
 
 ## printing completion time
 manager = MetricsManager(config_path="metric_config.json")
 
 print("adding all subjects")
 
-path_to_data = "/home/ndrakes1/surgical_skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data"
-add_all_subjects(manager, path_to_data)
+# path_to_data = "/home/ndrakes1/surgical_skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data"
+path_to_data = "/home/ndrakes1/surgical_skill_assessment/surgical-robotic-skill-assessment/preprocess/preprocessed_data_no_bad_instruments"
+manager.add_all_subjects(manager, path_to_data)
+
+print(manager.subjects)
+# exit()
 
 print("subjects added")
 
@@ -59,10 +28,10 @@ print("exporting to csv")
 
 metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", 
                 "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
-                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion"]
+                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion", "forcen_magnitude"]
 
 # manager.return_csv_header_ml(metric_names)
 # exit()
-manager.export_metrics_to_csv_ml(metric_names, "results_ml.csv")
-manager.export_metrics_to_csv(metric_names, "results.csv")
+manager.export_metrics_to_csv_ml(metric_names, "results_ml_force.csv")
+manager.export_metrics_to_csv(metric_names, "results_force.csv")
 print("finished")
