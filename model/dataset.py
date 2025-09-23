@@ -52,15 +52,23 @@ class MetricsMLPDataset(Dataset):
 
         # Keep trial IDs (optional, useful for analysis)
         self.trial_ids = df.iloc[:, 0].astype(str).tolist()
+        self.subject_ids = [tid.split("_")[0] for tid in self.trial_ids]
+        self.trial_nums = [tid.split("_")[1] if "_" in tid else None for tid in self.trial_ids]
 
-        # Decide which features to use
+        # Exclude these columns from features
+        exclude_cols = {"Subject_Trial", "LABEL", "subject_id", "trial_id"}
         if features is None:
-            features = self.DEFAULT_FEATURES
-        # Validate that all chosen features are present in df.columns
-        missing = [f for f in features if f not in df.columns]
-        if missing:
-            raise ValueError(f"Features not found in CSV columns: {missing}")
-        feature_df = df[features]
+            # Use all columns except exclude_cols
+            feature_cols = [col for col in df.columns if col not in exclude_cols]
+            feature_df = df[feature_cols]
+        else:
+            # Validate that all chosen features are present in df.columns and not in exclude_cols
+            missing = [f for f in features if f not in df.columns]
+            if missing:
+                raise ValueError(f"Features not found in CSV columns: {missing}")
+            # Remove any excluded columns from features
+            filtered_features = [f for f in features if f not in exclude_cols]
+            feature_df = df[filtered_features]
         self.X = torch.tensor(feature_df.values, dtype=x_dtype)
 
         # Compute mean and std along dataset (dim=0: column-wise), or use provided stats
@@ -76,8 +84,10 @@ class MetricsMLPDataset(Dataset):
 
         self.normalize = normalize
 
-        # Labels: last column -> class indices according to label_order
-        raw_labels = (df.iloc[:, -1].astype(str))
+        # Labels: use "LABEL" column, uppercase for consistency
+        if "LABEL" not in df.columns:
+            raise ValueError('CSV must contain a "LABEL" column.')
+        raw_labels = df["LABEL"].astype(str).str.upper()
 
         # mapping labels to ints
         self.label_mapping = {label_order[0]: 0, label_order[1]: 1, label_order[2]: 2}

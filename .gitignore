@@ -9,3 +9,5 @@ preprocess/__pycache__
 *.zip
 *__pycache__
 *.parquet
+*checkpoints
+*.png
