@@ -321,7 +321,7 @@ CROPPED_TIMES_PATH = os.path.join(os.path.dirname(__file__), "croppedTimes.csv")
 crop_df = pd.read_csv(CROPPED_TIMES_PATH, header=None, names=["subject", "trial", "start_time", "end_time"])
 crop_df.set_index(["subject", "trial"], inplace=True)
 
-path_to_write_data = "preprocessed_data"
+path_to_write_data = "preprocessed_data_no_bad_instruments"
 path_to_write_data_ = os.path.join(path_to_write_data)
 
 # Remove existing output directory if present and create fresh
@@ -350,8 +350,9 @@ for subject_dir in subject_dirs:
     for trial_count, trial_dir in enumerate(trial_dirs):
 
         valid_trials_csv = "/Users/noahdrakes/Documents/research/skill_assessment/MISTIC_robotic_suturing_study/protocol/trial_inclusion_matrix.csv"
+        valid_trials_no_broken_instruments = "/Users/noahdrakes/Documents/research/skill_assessment/MISTIC_robotic_suturing_study/protocol/trial_inclusion_matrix_no_faulty_instrument.csv"
 
-        if is_trial_valid(valid_trials_csv, subject_dir, trial_dir) != True:
+        if is_trial_valid(valid_trials_no_broken_instruments, subject_dir, trial_dir) != True:
             print("SKIPPING INVALID TRIAL")
             continue
 
