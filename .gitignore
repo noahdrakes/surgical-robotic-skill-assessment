@@ -10,3 +10,4 @@ preprocess/__pycache__
 *.parquet
 *checkpoints
 *.png
+*.csv

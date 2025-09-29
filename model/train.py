@@ -166,7 +166,27 @@ def main():
         "PSM2_forcen_magnitude"
     ]
 
-    FORCE_ACCEL_FEATURES = [
+    KINEMATICS = [
+        "completion_time",
+        "PSM1_average_speed_magnitude",
+        "PSM2_average_speed_magnitude",
+        "PSM1_average_acceleration_magnitude",
+        "PSM2_average_acceleration_magnitude",
+        "PSM1_average_jerk_magnitude",
+        "PSM2_average_jerk_magnitude",
+        "PSM1_total_path_length",
+        "PSM2_total_path_length",
+        "PSM1_average_angular_speed_magnitude",
+        "PSM2_average_angular_speed_magnitude",
+        "PSM1_PSM2_speed_correlation",
+        "PSM1_PSM2_speed_cross",
+        "PSM1_PSM2_acceleration_cross",
+        "PSM1_PSM2_jerk_cross",
+        "PSM1_PSM2_acceleration_dispertion",
+        "PSM1_PSM2_jerk_dispertion",
+    ]
+
+    KINETICS = [
         "ATIForceSensor_average_force_magnitude",
         "PSM1_forcen_magnitude",
         "PSM2_forcen_magnitude",
@@ -197,6 +217,7 @@ def main():
         "PSM1_PSM2_jerk_dispertion",
         "PSM1_forcen_magnitude",
         "PSM2_forcen_magnitude",
+        "PSM1_PMS2_forcen_cross",
     ]
 
     ALL_FEATURES_NO_FORCEN = [
@@ -221,7 +242,7 @@ def main():
     ]
 
     # CHOSE FEATURE SUBSET 
-    FEATURES = ALL_FEATURES_NO_FORCEN
+    FEATURES = KINETICS
 
     # Model
     parser.add_argument("--hidden1", type=int, default=64)

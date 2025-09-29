@@ -149,5 +149,19 @@
             "files": ["forcen_right.parquet"],
             "fields": ["force_x", "force_y"]
         }
+    },
+
+    "forcen_cross": {
+        "PSM1_PSM2": {
+            "files": ["forcen_left.parquet", "forcen_right.parquet"],
+            "fields": ["force_x", "force_y"]
+        }
+    },
+
+    "forcen_correlation": {
+        "PSM1_PSM2": {
+            "files": ["forcen_left.parquet", "forcen_right.parquet"],
+            "fields": ["force_x", "force_y"]
+        }
     }
 }

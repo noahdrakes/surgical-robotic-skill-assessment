@@ -28,7 +28,7 @@ print("exporting to csv")
 
 metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", 
                 "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
-                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion", "forcen_magnitude"]
+                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion", "forcen_magnitude", "forcen_cross", "forcen_correlation"]
 
 # manager.return_csv_header_ml(metric_names)
 # exit()

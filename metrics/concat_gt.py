@@ -1,5 +1,6 @@
 import csv
 import pandas as pd
+import sys
 
 
 def concatenate_labels(path_to_labels, path_to_metrics):
@@ -30,7 +31,10 @@ def concatenate_labels(path_to_labels, path_to_metrics):
     metrics_df.to_csv(path_to_metrics, index=False)
 
 
-concatenate_labels("~/surgical_skill_assessment/surgical-robotic-skill-assessment/labels/labels.csv","~/surgical_skill_assessment/surgical-robotic-skill-assessment/metrics/results_ml_force.csv")
+# concatenate_labels("~/surgical_skill_assessment/surgical-robotic-skill-assessment/labels/labels.csv","~/surgical_skill_assessment/surgical-robotic-skill-assessment/metrics/results_ml_force.csv")
+
+metrics_path = sys.argv[1]
+concatenate_labels("~/surgical_skill_assessment/surgical-robotic-skill-assessment/labels/labels.csv",metrics_path)
 
 
 

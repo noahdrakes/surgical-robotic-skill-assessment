@@ -29,6 +29,8 @@ class Metrics:
             "acceleration_dispertion": self.compute_accel_dispertion,
             "jerk_dispertion": self.compute_jerk_dispertion,
             "forcen_magnitude": self.compute_forcen_magnitude,
+            "forcen_cross": self.compute_forcen_cross,
+            "forcen_correlation": self.compute_forcen_correlation
             # "acceleration_nT": self.compute_acceleration_nT
         }
 
@@ -313,6 +315,43 @@ class Metrics:
             forcen_sq += trial_data[field] ** 2
         forcen_magnitude = np.sqrt(forcen_sq)
         return float(forcen_magnitude.mean())
+    
+    
+    def compute_forcen_cross(self, dfs, config):
+        PSMa_force, PSMb_force = list(dfs.values())
+
+        n = len(PSMa_force) if (len(PSMa_force) < len(PSMb_force)) else len(PSMb_force)
+
+        PSMa_force = PSMa_force[:n]
+        PSMb_force = PSMb_force[:n]
+
+        PSMa_force_magnitude = self.__compute_magnitude(PSMa_force, config,"fields")
+        PSMb_force_magnitude = self.__compute_magnitude(PSMb_force, config, "fields")
+
+        cross = self.__cross(PSMa_force_magnitude, PSMb_force_magnitude)
+        
+        # return np.mean(PSMa_accel_magnitude)
+        return cross
+    
+    def compute_forcen_correlation(self, dfs, config):
+
+        PSMa_force, PSMb_force = list(dfs.values())
+
+        n = len(PSMa_force) if (len(PSMa_force) < len(PSMb_force)) else len(PSMb_force)
+
+        PSMa_force = PSMa_force[:n]
+        PSMb_force = PSMb_force[:n]
+
+        PSMa_force_magnitude = self.__compute_magnitude(PSMa_force, config,"fields")
+        PSMb_force_magnitude = self.__compute_magnitude(PSMb_force, config, "fields")
+
+        cross = self.__cross(PSMa_force_magnitude, PSMb_force_magnitude)
+
+        r = np.corrcoef(PSMa_force_magnitude, PSMb_force_magnitude)[0][1]
+
+        return r
+        
+
 
 
     ## nT = normalized by Time 
