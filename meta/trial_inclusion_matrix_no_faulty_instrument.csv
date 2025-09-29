@@ -1,0 +1,24 @@
+Participant,Status,T01,T02,T03,T04,T05,T06,T07,T08,T09,T10,T11,Notes
+1,Surgical Educator,P,P,P,P,P,P,,,,,,
+2,Surgical Educator,F,F,P,P,P,F,F,F,P,P,P,
+3,PGY2 General Surgery,P,P,P,P,P,P,,,,,,
+4,PGY2 General Surgery,F,P,F,P,P,P,P,P,,,,
+5,PGY1 General Surgery,P,P,P,P,P,P,,,,,,
+6,PGY1 General Surgery,P,P,P,P,P,P,,,,,,
+7,PGY2 Transplant Surgery,P,F,P,P,P,P,P,,,,,Research year
+8,PGY2 General Surgery,P,P,P,P,P,P,,,,,,"Research year, cardiac surgery research"
+9,PGY3 General Surgery,P,P,P,P,P,P,,,,,,
+10,PGY2 General Surgery,P,P,F,P,P,P,P,,,,,
+11,PGY3 General Surgery,P,P,P,P,P,P,,,,,,Research year - PGY4 as of July 1
+12,Expert OBGYN,F,F,F,F,F,F,,,,,,
+13,PGY2 OBGYN,P,F,P,P,P,F,F,F,,,,
+14,PGY3 General Surgery,P,P,P,P,P,P,,,,,,
+15,PGY2 OBGYN,F,F,F,F,F,F,,,,,,
+16,Expert Colorectal,F,F,F,F,F,F,F,F,,,,
+17,Surgical Educator,P,P,P,P,P,P,,,,,,
+18,PGY3 General Surgery,P,P,P,P,P,P,,,,,,Research year - PGY4 as of July 1
+19,PGY2 General Surgery,P,P,P,P,P,P,,,,,,
+20,PGY2 OBGYN,P,P,P,P,P,P,,,,,,
+21,PGY1 General Surgery,P,P,P,P,P,P,,,,,,
+22,Expert Transplant,P,P,P,P,P,P,,,,,,
+23,PGY3 General Surgery,P,F,F,P,P,P,P,P,,,,Research year - PGY4 as of July 1

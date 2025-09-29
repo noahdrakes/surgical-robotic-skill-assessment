@@ -5,7 +5,6 @@ data/
 preprocess/aligned_data/
 preprocess/preprocessed_data
 preprocess/__pycache__
-*.csv
 *.zip
 *__pycache__
 *.parquet
