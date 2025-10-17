@@ -4,6 +4,7 @@ import random
 from typing import Optional
 
 import numpy as np
+import copy
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -143,7 +144,34 @@ def run_training(train_ds, val_ds, args, device, outpath):
     print(f"Best epoch: {best_epoch} | best_val_loss: {best_val_loss:.4f}\nSaved: {ckpt_path}")
     return best_val_loss, val_acc
 
+def compute_permutation_importance(model, val_ds, criterion, device, feature_names, n_repeats=1):
+    model.eval()
+    X = val_ds.X.clone().to(device)
+    y = val_ds.y.clone().to(device)
+    num_samples = val_ds.n_samples
 
+    # baseline
+    with torch.no_grad():
+        baseline_logits = model((X - val_ds.feature_mean.to(device)) / val_ds._std_safe.to(device))
+        baseline_acc = (baseline_logits.argmax(dim=1) == y).float().mean().item()
+
+    print(f"\nBaseline accuracy: {baseline_acc:.4f}")
+
+    importances = {}
+    for feat_idx, feat_name in enumerate(feature_names):
+        drops = []
+        for _ in range(n_repeats):
+            X_perm = X.clone()
+            perm_idx = torch.randperm(num_samples)
+            X_perm[:, feat_idx] = X_perm[perm_idx, feat_idx]
+            with torch.no_grad():
+                logits = model((X_perm - val_ds.feature_mean.to(device)) / val_ds._std_safe.to(device))
+                acc = (logits.argmax(dim=1) == y).float().mean().item()
+            drops.append(baseline_acc - acc)
+        importances[feat_name] = sum(drops) / len(drops)
+        print(f"{feat_name:40s}: Δacc = {importances[feat_name]:.4f}")
+
+    return importances
 # ---------------------------
 # Main
 # ---------------------------
@@ -170,8 +198,6 @@ def main():
         "completion_time",
         "PSM1_average_speed_magnitude",
         "PSM2_average_speed_magnitude",
-        "PSM1_average_acceleration_magnitude",
-        "PSM2_average_acceleration_magnitude",
         "PSM1_average_jerk_magnitude",
         "PSM2_average_jerk_magnitude",
         "PSM1_total_path_length",
@@ -180,9 +206,7 @@ def main():
         "PSM2_average_angular_speed_magnitude",
         "PSM1_PSM2_speed_correlation",
         "PSM1_PSM2_speed_cross",
-        "PSM1_PSM2_acceleration_cross",
         "PSM1_PSM2_jerk_cross",
-        "PSM1_PSM2_acceleration_dispertion",
         "PSM1_PSM2_jerk_dispertion",
     ]
 
@@ -194,6 +218,9 @@ def main():
         "PSM2_average_acceleration_magnitude",
         "PSM1_PSM2_acceleration_cross",
         "PSM1_PSM2_jerk_dispertion",
+        "PSM1_PSM2_forcen_cross",
+        "PSM1_PSM2_forcen_correlation",
+        "PSM1_PSM2_forcen_dispertion",
     ]
 
     ALL_FEATURES = [
@@ -242,7 +269,7 @@ def main():
     ]
 
     # CHOSE FEATURE SUBSET 
-    FEATURES = KINETICS
+    FEATURES = ALL_FEATURES_NO_FORCEN
 
     # Model
     parser.add_argument("--hidden1", type=int, default=64)
@@ -256,13 +283,17 @@ def main():
     parser.add_argument("--num_workers", type=int, default=0)
 
     # Misc
-    parser.add_argument("--seed", type=int, default=44)
+    parser.add_argument("--seed", type=int, default=43)
     parser.add_argument("--outdir", type=str, default="./checkpoints")
     args = parser.parse_args()
 
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.outdir, exist_ok=True)
+
+    model = []
+    # val_ds = []
+    # train_ds = []
 
     if args.validation_mode == "split":
         # Current scheme (manual CSVs)
@@ -330,6 +361,8 @@ def main():
         labels = [0, 1, 2]
         class_names = [str(l) for l in labels]
         plot_confusion_matrix(all_true, all_pred, labels, class_names, "LOUO Confusion Matrix")
+        print("\n=== Permutation Importance (LOUO aggregate model) ===")
+        importance_scores = compute_permutation_importance(model, val_ds, nn.CrossEntropyLoss(), device, FEATURES)
 
     elif args.validation_mode == "loso":
         if args.all_csv is None:
@@ -373,6 +406,7 @@ def main():
             print(f"Supertrial {trial}: Accuracy = {acc:.4f}")
         print(f"Mean acc: {np.mean([acc for _, acc in fold_accs]):.4f} ± {np.std([acc for _, acc in fold_accs]):.4f}")
 
+        
 
 if __name__ == "__main__":
     main()

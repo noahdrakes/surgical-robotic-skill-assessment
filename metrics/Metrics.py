@@ -30,7 +30,8 @@ class Metrics:
             "jerk_dispertion": self.compute_jerk_dispertion,
             "forcen_magnitude": self.compute_forcen_magnitude,
             "forcen_cross": self.compute_forcen_cross,
-            "forcen_correlation": self.compute_forcen_correlation
+            "forcen_correlation": self.compute_forcen_correlation, 
+            "forcen_dispertion": self.compute_forcen_dispertion
             # "acceleration_nT": self.compute_acceleration_nT
         }
 
@@ -350,6 +351,24 @@ class Metrics:
         r = np.corrcoef(PSMa_force_magnitude, PSMb_force_magnitude)[0][1]
 
         return r
+    
+    def compute_forcen_dispertion(self, dfs, config):
+
+        PSMa_force, PSMb_force = list(dfs.values())
+
+        n = len(PSMa_force) if (len(PSMa_force) < len(PSMb_force)) else len(PSMb_force)
+
+        PSMa_force = PSMa_force[:n]
+        PSMb_force = PSMb_force[:n]
+
+        PSMa_force_magnitude = self.__compute_magnitude(PSMa_force, config,"fields")
+        PSMb_force_magnitude = self.__compute_magnitude(PSMb_force, config, "fields")
+
+        PSMa_force_std = np.std(PSMa_force_magnitude)
+        PSMb_force_std = np.std(PSMb_force_magnitude)
+
+        return np.abs ((PSMa_force_std - PSMb_force_std)/(PSMa_force_std + PSMb_force_std))
+
         
 
 

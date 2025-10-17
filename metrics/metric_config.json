@@ -163,5 +163,12 @@
             "files": ["forcen_left.parquet", "forcen_right.parquet"],
             "fields": ["force_x", "force_y"]
         }
+    },
+
+    "forcen_dispertion": {
+        "PSM1_PSM2": {
+            "files": ["forcen_left.parquet", "forcen_right.parquet"],
+            "fields": ["force_x", "force_y"]
+        }
     }
 }

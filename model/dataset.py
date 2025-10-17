@@ -58,6 +58,7 @@ class MetricsMLPDataset(Dataset):
         # Exclude these columns from features
         exclude_cols = {"Subject_Trial", "LABEL", "subject_id", "trial_id"}
         if features is None:
+            print("FEATURES IS NONE")
             # Use all columns except exclude_cols
             feature_cols = [col for col in df.columns if col not in exclude_cols]
             feature_df = df[feature_cols]
@@ -98,6 +99,7 @@ class MetricsMLPDataset(Dataset):
         # Convenience attributes
         self.n_features = self.X.shape[1]
         self.n_classes = len(self.label_mapping)
+        self.n_samples = self.X.shape[0]
 
     def __len__(self):
         return self.X.shape[0]
@@ -107,6 +109,7 @@ class MetricsMLPDataset(Dataset):
             return (self.X[idx] - self.feature_mean) / self._std_safe, self.y[idx]
         else:
             return self.X[idx], self.y[idx]
+    
 
 # Example usage:
 # train_ds = MetricsMLPDataset("train.csv", normalize=True)
