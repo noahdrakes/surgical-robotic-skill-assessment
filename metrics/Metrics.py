@@ -83,22 +83,38 @@ class Metrics:
             accel_sqrd += pow(acceleration.mean(), 2)
 
         return float(math.sqrt(accel_sqrd))
+    
+    def _compute_jerk(self, dfs, cnfig):
+        i =1 
 
     def compute_average_jerk_magnitude(self, dfs, config):
-        trial_data = list(dfs.values())[0]
-        timestamps = trial_data[config["timestamp_col"]]
-
-        dt = np.diff(timestamps)
-        jerk_sqrd = 0
-
-        for field in config["velocity_fields"]:
-            velocity = trial_data[field]
-            acceleration = np.diff(velocity) / dt
-            dt_accel = dt[1:]
-            jerk = np.diff(acceleration) / dt_accel
-            jerk_sqrd += np.mean(jerk**2)
         
-        return float(math.sqrt(jerk_sqrd))
+
+        if config["using_accel"]:
+            trial_data = list(dfs.values())[1]
+            timestamps = trial_data[config["timestamp_col"]]
+            dt = np.diff(timestamps)
+            jerk_sqrd = 0
+            for field in config["acceleration_fields"]:
+                acceleration = trial_data[field]
+                jerk = np.diff(acceleration) / dt
+                jerk_sqrd += np.mean(jerk**2)
+            return float(math.sqrt(jerk_sqrd))
+        else:
+
+            trial_data = list(dfs.values())[0]
+            timestamps = trial_data[config["timestamp_col"]]
+            dt = np.diff(timestamps)
+            jerk_sqrd = 0
+
+            for field in config["velocity_fields"]:
+                velocity = trial_data[field]
+                acceleration = np.diff(velocity) / dt
+                dt_accel = dt[1:]
+                jerk = np.diff(acceleration) / dt_accel
+                jerk_sqrd += np.mean(jerk**2)
+            
+            return float(math.sqrt(jerk_sqrd))
     
     def compute_average_force_magnitude(self, dfs, config):
         trial_data = list(dfs.values())[0]

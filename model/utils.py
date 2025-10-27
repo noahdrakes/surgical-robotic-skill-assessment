@@ -117,12 +117,12 @@ def run_training(train_ds, val_ds, args, device, outpath):
         val_loss, val_acc     = evaluate(model, val_loader, criterion, device)
         scheduler.step(val_loss)
 
-        print(
-            f"Epoch {epoch:03d} | "
-            f"train_loss: {train_loss:.4f}  train_acc: {train_acc:.4f} | "
-            f"val_loss: {val_loss:.4f}  val_acc: {val_acc:.4f} | "
-            f"lr: {optimizer.param_groups[0]['lr']:.2e}"
-        )
+        # print(
+        #     f"Epoch {epoch:03d} | "
+        #     f"train_loss: {train_loss:.4f}  train_acc: {train_acc:.4f} | "
+        #     f"val_loss: {val_loss:.4f}  val_acc: {val_acc:.4f} | "
+        #     f"lr: {optimizer.param_groups[0]['lr']:.2e}"
+        # )
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -139,15 +139,21 @@ def run_training(train_ds, val_ds, args, device, outpath):
     print(f"Best epoch: {best_epoch} | best_val_loss: {best_val_loss:.4f}\nSaved: {ckpt_path}")
     return best_val_loss, val_acc
 
-def compute_permutation_importance(model, val_ds, criterion, device, feature_names, n_repeats=1):
+
+
+#### PERMUTATION IMPORTANCE #########
+
+def compute_permutation_importance(model, dataset, criterion, device, feature_names, n_repeats=1):
     model.eval()
-    X = val_ds.X.clone().to(device)
-    y = val_ds.y.clone().to(device)
-    num_samples = val_ds.n_samples
+    X = dataset.X.clone().to(device)
+    y = dataset.y.clone().to(device)
+    num_samples = dataset.n_samples
 
     # baseline
     with torch.no_grad():
-        baseline_logits = model((X - val_ds.feature_mean.to(device)) / val_ds._std_safe.to(device))
+
+        # pass dataset normalized dataset through model to get baseline accuracy
+        baseline_logits = model((X - dataset.feature_mean.to(device)) / dataset._std_safe.to(device))
         baseline_acc = (baseline_logits.argmax(dim=1) == y).float().mean().item()
 
     print(f"\nBaseline accuracy: {baseline_acc:.4f}")
@@ -160,10 +166,24 @@ def compute_permutation_importance(model, val_ds, criterion, device, feature_nam
             perm_idx = torch.randperm(num_samples)
             X_perm[:, feat_idx] = X_perm[perm_idx, feat_idx]
             with torch.no_grad():
-                logits = model((X_perm - val_ds.feature_mean.to(device)) / val_ds._std_safe.to(device))
+                logits = model((X_perm - dataset.feature_mean.to(device)) / dataset._std_safe.to(device))
                 acc = (logits.argmax(dim=1) == y).float().mean().item()
             drops.append(baseline_acc - acc)
         importances[feat_name] = sum(drops) / len(drops)
         print(f"{feat_name:40s}: Δacc = {importances[feat_name]:.4f}")
 
     return importances
+
+
+def plot_permutation_importance(importances, title="Permutation Importance (Δ Accuracy)"):
+    # Convert to sorted list of tuples
+    features, values = zip(*sorted(importances.items(), key=lambda x: x[1], reverse=True))
+
+    plt.figure(figsize=(8, 6))
+    plt.barh(features, values, color="skyblue", edgecolor="black")
+    plt.gca().invert_yaxis()  # most important feature at top
+    plt.xlabel("Δ Accuracy (drop after shuffling)")
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig("permutation_importance.png", dpi=300, bbox_inches="tight")
+    plt.close()
