@@ -30,6 +30,18 @@ KINETICS = [
     "PSM1_PSM2_forcen_dispertion",
     "PSM1_average_jerk_magnitude",
     "PSM2_average_jerk_magnitude",
+    "PSM1_average_jerk_magnitude_nT",
+    "PSM2_average_jerk_magnitude_nT",
+    "PSM1_average_jerk_magnitude_nPL",
+    "PSM2_average_jerk_magnitude_nPL",
+    "ATIForceSensor_average_force_magnitude",
+    "ATIForceSensor_average_force_magnitude_nT",
+    "ATIForceSensor_average_force_magnitude_nPL",
+    "ATIForceSensor_max_force_magnitude",
+    "ATIForceSensor_min_force_magnitude",
+    "ATIForceSensor_max_force_x",
+    "ATIForceSensor_max_force_y",
+    "ATIForceSensor_max_force_z",
 ]
 
 ALL_FEATURES = [

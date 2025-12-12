@@ -26,9 +26,20 @@ output_csv_path = "results.csv"
 
 print("exporting to csv")
 
-metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", 
+metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", "average_jerk_magnitude_nT", "average_jerk_magnitude_nPL",
                 "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
-                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion", "forcen_magnitude", "forcen_cross", "forcen_correlation", "forcen_dispertion"]
+                "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion", "forcen_magnitude", "forcen_cross", "forcen_correlation", "forcen_dispertion",
+                "max_force_magnitude", "min_force_magnitude", "max_force_x", "max_force_y", ]
+
+# metric_names = ["completion_time", "average_speed_magnitude", "average_acceleration_magnitude", "average_jerk_magnitude", "average_jerk_magnitude_nT",
+#                 "average_force_magnitude", "total_path_length", "average_angular_speed_magnitude", "speed_correlation", "speed_cross",
+#                 "acceleration_cross", "jerk_cross", "acceleration_dispertion", "jerk_dispertion",
+#                 "max_force_magnitude", "min_force_magnitude", "max_force_x", "max_force_y","max_force_z" ]
+
+
+print()
+print()
+print("ALL METRICS: ", metric_names)
 
 # manager.return_csv_header_ml(metric_names)
 # exit()

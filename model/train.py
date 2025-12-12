@@ -37,9 +37,31 @@ def main():
    
 
     # CHOSE FEATURE SUBSET 
-    FEATURES = feats.KINEMATICS
-    FEATURES.append(feats.KINETICS[0])
+    # FEATURES = feats.ALL_FEATURES
 
+    # FEATURES = feats.KINEMATICS
+    # FEATURES.append(feats.KINETICS[12])
+    # FEATURES.append(feats.KINETICS[13])
+    # FEATURES.append(feats.KINETICS[14])
+    # FEATURES.append(feats.KINETICS[15])
+    # FEATURES.append(feats.KINETICS[16])
+
+    FEATURES = feats.KINEMATICS
+    
+    # FEATURES.append(feats.KINETICS[10])
+    # FEATURES.append(feats.KINETICS[11])
+    FEATURES.append(feats.KINETICS[12])
+    FEATURES.append(feats.KINETICS[13])
+    FEATURES.append(feats.KINETICS[14])
+    FEATURES.append(feats.KINETICS[15])
+    # FEATURES.append(feats.KINETICS[16])
+    # FEATURES.append(feats.KINETICS[17])
+    # FEATURES.append(feats.KINETICS[18])
+    
+
+
+
+    
     # Model
     parser.add_argument("--hidden1", type=int, default=64)
     parser.add_argument("--hidden2", type=int, default=32)
@@ -54,6 +76,7 @@ def main():
     # Misc
     parser.add_argument("--seed", type=int, default=43)
     parser.add_argument("--outdir", type=str, default="./checkpoints")
+    parser.add_argument("--eval_ds", type=str, default="val")
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -85,6 +108,7 @@ def main():
 
         fold_accs = []  
         all_true, all_pred = [], []
+        all_importances = []
         for subj in subjects:
             print(f"\n=== LOUO fold: leaving out subject {subj} ===")
             train_df = df[df["subject_id"] != subj]
@@ -119,6 +143,12 @@ def main():
             all_true.extend(targets)
             all_pred.extend(preds)
 
+            # Compute permutation importance for this fold
+
+            if args.eval_ds == "val":
+                importance_scores = compute_permutation_importance(model, val_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20)
+                all_importances.append(importance_scores)
+
         print("\n=== LOUO Summary ===")
         for subj, acc in fold_accs:
             print(f"Subject {subj}: Accuracy = {acc:.4f}")
@@ -129,12 +159,25 @@ def main():
         plot_confusion_matrix(all_true, all_pred, labels, class_names, "LOUO Confusion Matrix")
         print("\n=== Permutation Importance (LOUO aggregate model) ===")
 
-        val_ds   = MetricsMLPDataset("tmp_val.csv", normalize=True,
-                                         norm_mean=train_ds.feature_mean,
-                                         norm_std=train_ds.feature_std,
-                                         features=FEATURES)
-        importance_scores = compute_permutation_importance(model, train_ds, nn.CrossEntropyLoss(), device, FEATURES)
-        plot_permutation_importance(importances=importance_scores)
+        # Compute mean importance scores across folds
+        # permutation importance over validation 
+        if args.eval_ds == "val":
+            mean_importance_scores = {}
+            for feature in FEATURES:
+                vals = [imp.get(feature, 0) for imp in all_importances]
+                mean_importance_scores[feature] = np.mean(vals)
+
+            for feature, mean_val in mean_importance_scores.items():
+                print(f"{feature}: Δacc = {mean_val:.6f}")
+            plot_permutation_importance(importances=mean_importance_scores)
+        ##############################################
+
+        
+        if args.eval_ds == "train":
+            print("PERMUTAITON IMPORTANCE OVER TRAINING")
+            ## permutation importance over training
+            importance_scores = compute_permutation_importance(model, train_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20)
+            plot_permutation_importance(importances=importance_scores)
 
     elif args.validation_mode == "loso":
         if args.all_csv is None:
