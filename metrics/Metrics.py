@@ -6,6 +6,13 @@ import pandas as pd
 import os
 from tqdm import tqdm
 
+from scipy.signal import butter, filtfilt
+
+def lowpass_filter(signal, fs, cutoff=10.0, order=4):
+    nyq = 0.5 * fs
+    b, a = butter(order, cutoff / nyq, btype="low")
+    return filtfilt(b, a, signal)
+
 completion_time_count = 0
 
 class Metrics:
@@ -22,9 +29,11 @@ class Metrics:
             "completion_time": self.compute_completion_time,
             "average_speed_magnitude": self.compute_average_speed_magnitude,
             "average_acceleration_magnitude": self.compute_average_acceleration_magnitude,
+            "acceleration_effort_nPL": self.compute_acceleration_effort_nPL, ##
+            "acceleration_effort_nT": self.compute_acceleration_effort_nT, ##
             "average_jerk_magnitude": self.compute_average_jerk_magnitude,
-            "average_jerk_magnitude_nT": self.compute_average_jerk_magnitude_nT,
-            "average_jerk_magnitude_nPL": self.compute_average_jerk_magnitude_nPL,
+            "jerk_effort_nT": self.compute_jerk_effort_nT, ##
+            "jerk_effort_nPL": self.compute_jerk_effort_nPL,
             "average_force_magnitude": self.compute_average_force_magnitude,
             "average_force_magnitude_nT": self.compute_average_force_magnitude_nT,
             "average_force_magnitude_nPL": self.compute_average_force_magnitude_nPL,
@@ -41,6 +50,8 @@ class Metrics:
             "forcen_correlation": self.compute_forcen_correlation, 
             "forcen_dispertion": self.compute_forcen_dispertion,
             "max_force_magnitude": self.compute_max_force_magnitude,
+            "max_force_magnitude_nT": self.compute_max_force_magnitude_nT,
+            "max_force_magnitude_nPL": self.compute_max_force_magnitude_nPL,
             "min_force_magnitude": self.compute_min_force_magnitude,
             "max_force_x": self.compute_max_force_x,
             "max_force_y": self.compute_max_force_y,
@@ -60,7 +71,7 @@ class Metrics:
 
         return end_time - start_time
     
-    def compute_total_path_length(self, dfs, config, normalize = False):
+    def compute_total_path_length(self, dfs, config, normalize = False, bimanual = False):
 
         ## NOTE: if we are using this method to normalize a metric, we should 
         ## pull data from the last file in the list of files which would be 
@@ -73,16 +84,38 @@ class Metrics:
         if normalize == True:
             trial_data = list(dfs.values())[-1]
             fields = "path_length_fields"
-            # print("correct normalization")
+            # print()
+            # print()
+            # print()
+            # print("NORMALIZATION")
+            # print()
+            # print()
+            # print()
         else:
             trial_data = list(dfs.values())[0]
             fields = "fields"
 
+        total_path_length = 0
+
         field_diff_sqred = np.zeros(len(trial_data) - 1)
         for field in config[fields]:
             field_diff_sqred += np.diff(trial_data[field]) ** 2
-        
-        return float(np.sqrt(field_diff_sqred).sum())
+
+        total_path_length = float(np.sqrt(field_diff_sqred).sum())
+
+        ## if the metric utilizes both PSM's, then we calculate path length as the sum of path lengths 
+        ## for both PSM's
+        ## the parquet files for path lenghts are just indexed as the last and second to last files in the files section for the json. 
+        if bimanual:
+            trial_data = list(dfs.values())[-2]
+            fields = "path_length_fields"
+            field_diff_sqred = np.zeros(len(trial_data) - 1)
+            for field in config[fields]:
+                field_diff_sqred += np.diff(trial_data[field]) ** 2
+
+            total_path_length += float(np.sqrt(field_diff_sqred).sum())
+ 
+        return total_path_length
         
     def compute_average_speed_magnitude(self, dfs, config):
         trial_data = list(dfs.values())[0]
@@ -94,33 +127,55 @@ class Metrics:
         return float(speed_magnitude.mean())
 
     def compute_average_acceleration_magnitude(self, dfs, config):
-        # If using_accel is True and an accel file is present, use it
-        if config["using_accel"] and len(dfs) > 1:
-            # using dataframe that contains the word accel in it to use the accelerometer signal to 
-            # do the calculation, as opposed to measured velocity
-            accel_df = next((df for fname, df in dfs.items() if "accel" in fname.lower()), None)
-            if accel_df is not None:
-                # accel_sqrd = 0
-                # for field in config["acceleration_fields"]:
-                #     acceleration = accel_df[field]
-                #     accel_sqrd += pow(acceleration.mean(), 2)
-                accel_mag = self.__compute_magnitude(accel_df, config, "acceleration_fields")
-                return np.mean(accel_mag)
-
-
-                return float(math.sqrt(accel_sqrd))
-
-        # Otherwise compute acceleration from velocity
+        # Select the acceleration dataframe
         trial_data = list(dfs.values())[0]
-        timestamps = trial_data[config["timestamp_col"]]
-        dt = np.diff(timestamps)
-        accel_sqrd = 0
-        for field in config["velocity_fields"]:
-            velocity = trial_data[field]
-            acceleration = np.diff(velocity) / dt
-            accel_sqrd += pow(acceleration.mean(), 2)
+        timestamps = trial_data[config["timestamp_col"]].values
 
-        return float(math.sqrt(accel_sqrd))
+        # Extract acceleration components
+        ax = trial_data[config["acceleration_fields"][0]].values
+        ay = trial_data[config["acceleration_fields"][1]].values
+        az = trial_data[config["acceleration_fields"][2]].values
+
+        # Compute instantaneous acceleration magnitude
+        accel_mag = np.sqrt(ax**2 + ay**2 + az**2)
+
+        # Return the mean magnitude
+        return float(np.mean(accel_mag))
+
+    
+    def compute_acceleration_effort_nPL(self, dfs, config):
+        trial_data = list(dfs.values())[0] if config["using_accel"] else list(dfs.values())[0]
+        timestamps = trial_data[config["timestamp_col"]].values
+        ax = trial_data[config["acceleration_fields"][0]].values
+        ay = trial_data[config["acceleration_fields"][1]].values
+        az = trial_data[config["acceleration_fields"][2]].values
+
+        # Instantaneous magnitude
+        a_mag = np.sqrt(ax**2 + ay**2 + az**2)
+
+        # Integrate magnitude over time
+        a_total = np.trapz(a_mag, timestamps)
+
+        # Normalize by total path length
+        path_length = self.compute_total_path_length(dfs, config, normalize=True)
+        return a_total / path_length
+
+    def compute_acceleration_effort_nT(self, dfs, config):
+        trial_data = list(dfs.values())[0] if config["using_accel"] else list(dfs.values())[0]
+        timestamps = trial_data[config["timestamp_col"]].values
+        ax = trial_data[config["acceleration_fields"][0]].values
+        ay = trial_data[config["acceleration_fields"][1]].values
+        az = trial_data[config["acceleration_fields"][2]].values
+
+        # Instantaneous magnitude
+        a_mag = np.sqrt(ax**2 + ay**2 + az**2)
+
+        # Integrate magnitude over time
+        a_total = np.trapz(a_mag, timestamps)
+
+        # Normalize by completion time
+        completion_time = self.compute_completion_time(dfs, config)
+        return a_total / completion_time
 
     def compute_average_jerk_magnitude(self, dfs, config):
         
@@ -134,9 +189,10 @@ class Metrics:
             ay = trial_data[config["acceleration_fields"][1]]
             az = trial_data[config["acceleration_fields"][2]]
              # Compute jerk components
-            jx = np.diff(ax) / dt
-            jy = np.diff(ay) / dt
-            jz = np.diff(az) / dt
+            
+            jx = np.gradient(ax, timestamps)
+            jy = np.gradient(ay, timestamps)
+            jz = np.gradient(az, timestamps)
 
             # Jerk magnitude at each timestep
             jerk_mag = np.sqrt(jx**2 + jy**2 + jz**2)
@@ -161,7 +217,7 @@ class Metrics:
             
             return float(math.sqrt(jerk_sqrd))
         
-    def compute_average_jerk_magnitude_nT(self,dfs, config):
+    def compute_jerk_effort_nT(self,dfs, config):
         jerk_magnitude = 0
 
         if config["using_accel"]:
@@ -174,17 +230,18 @@ class Metrics:
             az = trial_data[config["acceleration_fields"][2]]
 
              # Compute jerk components
-            jx = np.diff(ax) / dt
-            jy = np.diff(ay) / dt
-            jz = np.diff(az) / dt
+            
+            jx = np.gradient(ax, timestamps)
+            jy = np.gradient(ay, timestamps)
+            jz = np.gradient(az, timestamps)
 
             # Jerk magnitude at each timestep
             jerk_mag = np.sqrt(jx**2 + jy**2 + jz**2)
 
             # Sum magnitudes, divide by path length
-            average_jerk_magnitude = jerk_mag.sum()
+            J = np.trapz(jerk_mag, timestamps) 
 
-            return average_jerk_magnitude / self.compute_completion_time(dfs,config)
+            return J / self.compute_completion_time(dfs,config)
         else:
 
             trial_data = list(dfs.values())[0]
@@ -207,7 +264,7 @@ class Metrics:
     
 
 
-    def compute_average_jerk_magnitude_nPL(self,dfs, config):
+    def compute_jerk_effort_nPL(self,dfs, config):
         jerk_magnitude = 0
 
         if config["using_accel"]:
@@ -219,18 +276,32 @@ class Metrics:
             ay = trial_data[config["acceleration_fields"][1]]
             az = trial_data[config["acceleration_fields"][2]]
 
+            # fs = 1.0 / np.mean(np.diff(timestamps))
+            # fs =377
+
+            # ax_f = lowpass_filter(ax.to_numpy(), fs, cutoff=10)
+            # ay_f = lowpass_filter(ay.to_numpy(), fs, cutoff=10)
+            # az_f = lowpass_filter(az.to_numpy(), fs, cutoff=10)
+
              # Compute jerk components
-            jx = np.diff(ax) / dt
-            jy = np.diff(ay) / dt
-            jz = np.diff(az) / dt
+            # jx = np.diff(ax) / dt
+            # jy = np.diff(ay) / dt
+            # jz = np.diff(az) / dt
+
+            ## smoother differentiation
+            jx = np.gradient(ax, timestamps)
+            jy = np.gradient(ay, timestamps)
+            jz = np.gradient(az, timestamps)
+
+            
 
             # Jerk magnitude at each timestep
             jerk_mag = np.sqrt(jx**2 + jy**2 + jz**2)
 
             # Sum magnitudes, divide by path length
-            average_jerk_magnitude = jerk_mag.sum()
+            J = np.trapz(jerk_mag, timestamps) 
 
-            return average_jerk_magnitude / self.compute_total_path_length(dfs,config, normalize=True)
+            return J / self.compute_total_path_length(dfs,config, normalize=True)
         else:
 
             trial_data = list(dfs.values())[0]
@@ -272,9 +343,11 @@ class Metrics:
             force_sq += trial_data[field] ** 2
         force_magnitude = np.sqrt(force_sq)
 
+        average_force = force_magnitude.mean()
+
         completion_time = self.compute_completion_time(dfs, config)
 
-        return float(force_magnitude.mean()) / completion_time
+        return average_force / completion_time
     
     def compute_average_force_magnitude_nPL(self, dfs, config):
         trial_data = list(dfs.values())[0]
@@ -285,8 +358,10 @@ class Metrics:
             force_sq += trial_data[field] ** 2
         force_magnitude = np.sqrt(force_sq)
 
+        average_force = force_magnitude.mean()
+
         path_length = self.compute_total_path_length(dfs, config, normalize=True)
-        return float(force_magnitude.mean()) / path_length
+        return average_force / path_length
     
     
     
@@ -551,6 +626,19 @@ class Metrics:
         force_magnitude = np.sqrt(force_sq)
 
         return float(force_magnitude.max())
+    
+    def compute_max_force_magnitude_nT(self, dfs, config):
+
+        max_force_magnitude = self.compute_max_force_magnitude(dfs, config)
+
+        return max_force_magnitude/self.compute_completion_time(dfs,config)
+    
+    def compute_max_force_magnitude_nPL(self, dfs, config):
+
+        max_force_magnitude = self.compute_max_force_magnitude(dfs, config)
+
+        return max_force_magnitude/self.compute_total_path_length(dfs, config, normalize=True, bimanual=True)
+    
     
 
     def compute_max_force_x(self,dfs,config):

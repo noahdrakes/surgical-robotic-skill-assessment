@@ -15,16 +15,52 @@
     },
     "average_acceleration_magnitude": {
         "PSM1": {
-            "files": ["PSM1measured_cp.parquet", "accel_right.parquet"],
+            "files": ["accel_right.parquet"],
             "fields": ["vel_x", "vel_y", "vel_z"],
             "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
             "timestamp_col": "ts_ns",
             "using_accel": true
         },
         "PSM2": {
-            "files": ["PSM2measured_cp.parquet", "accel_left.parquet"],
+            "files": ["accel_left.parquet"],
             "velocity_fields": ["vel_x", "vel_y", "vel_z"],
             "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        }
+    },
+
+    "acceleration_effort_nT": {
+        "PSM1": {
+            "files": ["accel_right.parquet"],
+            "fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        },
+        "PSM2": {
+            "files": ["accel_left.parquet"],
+            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        }
+    },
+
+    "acceleration_effort_nPL": {
+        "PSM1": {
+            "files": ["accel_right.parquet", "PSM1measured_cp.parquet"],
+            "fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "path_length_fields": ["pos_x", "pos_y", "pos_z"],
+            "timestamp_col": "ts_ns",
+            "using_accel": true
+        }, 
+        "PSM2": {
+            "files": ["accel_left.parquet", "PSM2measured_cp.parquet"],
+            "velocity_fields": ["vel_x", "vel_y", "vel_z"],
+            "acceleration_fields": ["linear_accel_x", "linear_accel_y", "linear_accel_z"],
+            "path_length_fields": ["pos_x", "pos_y", "pos_z"],
             "timestamp_col": "ts_ns",
             "using_accel": true
         }
@@ -45,7 +81,7 @@
              "using_accel":true
         }
     },
-    "average_jerk_magnitude_nT": {
+    "jerk_effort_nT": {
         "PSM1": {
             "files": ["PSM1bodymeasured_cv.parquet", "accel_right.parquet"],
             "velocity_fields": ["linear_x", "linear_y", "linear_z"],
@@ -62,7 +98,7 @@
         }
     },
 
-    "average_jerk_magnitude_nPL": {
+    "jerk_effort_nPL": {
         "PSM1": {
             "files": ["PSM1bodymeasured_cv.parquet", "accel_right.parquet", "PSM1measured_cp.parquet"],
             "velocity_fields": ["linear_x", "linear_y", "linear_z"],
@@ -110,6 +146,23 @@
         "ATIForceSensor": {
             "files": ["ATImini40.parquet"],
             "fields": ["force_x", "force_y", "force_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "max_force_magnitude_nT": {
+        "ATIForceSensor": {
+            "files": ["ATImini40.parquet"],
+            "fields": ["force_x", "force_y", "force_z"],
+            "timestamp_col": "ts_ns"
+        }
+    },
+
+    "max_force_magnitude_nPL": {
+        "ATIForceSensor": {
+            "files": ["ATImini40.parquet", "PSM1measured_cp.parquet",  "PSM2measured_cp.parquet"],
+            "fields": ["force_x", "force_y", "force_z"],
+            "path_length_fields": ["pos_x", "pos_y", "pos_z"],
             "timestamp_col": "ts_ns"
         }
     },

@@ -9,7 +9,7 @@ import sys
 
 # === CONFIGURATION ===
 CSV_PATH = sys.argv[1]
-OUT_DIR = "correlation_curves_reduced_dataset_1"
+OUT_DIR = sys.argv[2]
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # === LOAD DATA ===
