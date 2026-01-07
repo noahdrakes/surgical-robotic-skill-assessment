@@ -1,22 +1,17 @@
 import argparse
 import os
-import random
-from typing import Optional
 
 import numpy as np
-import copy
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import pandas as pd
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
 
 # Local imports
 from dataset import MetricsMLPDataset
 from network import metricsMLP
-from utils import set_seed, accuracy, plot_confusion_matrix # utils
-from utils import train_one_epoch, evaluate, run_training, compute_permutation_importance, plot_permutation_importance # training/eval
+from utils import set_seed, plot_confusion_matrix, plot_loss_curves
+from utils import evaluate, run_training, compute_permutation_importance, plot_permutation_importance
 import feats
 
 # ---------------------------
@@ -36,41 +31,24 @@ def main():
 
    
 
-    # CHOSE FEATURE SUBSET 
-    # FEATURES = feats.ALL_FEATURES
-
+    # Choose feature subset
+    # FEATURES = feats.ALL_FEATURESßß
+    # FEATURES = feats.ALL_FEATURES_NO_FORCEN
     # FEATURES = feats.KINEMATICS
-    # FEATURES.append(feats.KINETICS[12])
-    # FEATURES.append(feats.KINETICS[13])
-    # FEATURES.append(feats.KINETICS[14])
-    # FEATURES.append(feats.KINETICS[15])
-    # FEATURES.append(feats.KINETICS[16])
-
-    FEATURES = feats.KINEMATICS
-    
-    # FEATURES.append(feats.KINETICS[10])
-    # FEATURES.append(feats.KINETICS[11])
-    FEATURES.append(feats.KINETICS[12])
-    FEATURES.append(feats.KINETICS[13])
-    FEATURES.append(feats.KINETICS[14])
-    FEATURES.append(feats.KINETICS[15])
-    # FEATURES.append(feats.KINETICS[16])
-    # FEATURES.append(feats.KINETICS[17])
-    # FEATURES.append(feats.KINETICS[18])
-    
-
-
-
+    FEATURES = feats.ALL_FEATURES
+    # Example: mix kinematics + selected kinetics
+    # FEATURES = feats.KINEMATICS + feats.KINETICS[8:12]
+    # FEATURES = feats.KINETICS
     
     # Model
     parser.add_argument("--hidden1", type=int, default=64)
-    parser.add_argument("--hidden2", type=int, default=32)
+    parser.add_argument("--hidden2", type=int, default=64)
 
     # Optimization
-    parser.add_argument("--epochs", type=int, default=500)
-    parser.add_argument("--batch_size", type=int, default=256)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight_decay", type=float, default=1e-4)
+    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--weight_decay", type=float, default=1e-6)
     parser.add_argument("--num_workers", type=int, default=0)
 
     # Misc
@@ -106,10 +84,10 @@ def main():
         # Now subjects are accessible
         subjects = df["subject_id"].unique()
 
-        fold_accs = []  
+        fold_accs = []
         all_true, all_pred = [], []
         all_importances = []
-        for subj in subjects:
+        for fold_idx, subj in enumerate(subjects):
             print(f"\n=== LOUO fold: leaving out subject {subj} ===")
             train_df = df[df["subject_id"] != subj]
             val_df   = df[df["subject_id"] == subj]
@@ -124,7 +102,19 @@ def main():
                                          features=FEATURES)
 
             ckpt_path = os.path.join(args.outdir, f"mlp_best_subj{subj}.pt")
-            _, val_acc = run_training(train_ds, val_ds, args, device, ckpt_path)
+            if fold_idx == 5:
+                _, val_acc, history = run_training(
+                    train_ds, val_ds, args, device, ckpt_path, return_history=True
+                )
+                plot_path = os.path.join(args.outdir, "louo_first_fold_loss.png")
+                plot_loss_curves(
+                    history["train_loss"],
+                    history["val_loss"],
+                    plot_path,
+                    title=f"LOUO First Fold Loss (subject {subj})",
+                )
+            else:
+                _, val_acc = run_training(train_ds, val_ds, args, device, ckpt_path)
             fold_accs.append((subj, val_acc))
 
             # Reload model and evaluate with return_preds=True
@@ -143,10 +133,16 @@ def main():
             all_true.extend(targets)
             all_pred.extend(preds)
 
-            # Compute permutation importance for this fold
-
+            # Compute permutation importance per fold for aggregation
             if args.eval_ds == "val":
-                importance_scores = compute_permutation_importance(model, val_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20)
+                importance_scores = compute_permutation_importance(
+                    model, val_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20
+                )
+                all_importances.append(importance_scores)
+            elif args.eval_ds == "train":
+                importance_scores = compute_permutation_importance(
+                    model, train_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20
+                )
                 all_importances.append(importance_scores)
 
         print("\n=== LOUO Summary ===")
@@ -159,9 +155,8 @@ def main():
         plot_confusion_matrix(all_true, all_pred, labels, class_names, "LOUO Confusion Matrix")
         print("\n=== Permutation Importance (LOUO aggregate model) ===")
 
-        # Compute mean importance scores across folds
-        # permutation importance over validation 
-        if args.eval_ds == "val":
+        # Aggregate permutation importance across folds
+        if all_importances:
             mean_importance_scores = {}
             for feature in FEATURES:
                 vals = [imp.get(feature, 0) for imp in all_importances]
@@ -170,14 +165,6 @@ def main():
             for feature, mean_val in mean_importance_scores.items():
                 print(f"{feature}: Δacc = {mean_val:.6f}")
             plot_permutation_importance(importances=mean_importance_scores)
-        ##############################################
-
-        
-        if args.eval_ds == "train":
-            print("PERMUTAITON IMPORTANCE OVER TRAINING")
-            ## permutation importance over training
-            importance_scores = compute_permutation_importance(model, train_ds, nn.CrossEntropyLoss(), device, FEATURES, n_repeats=20)
-            plot_permutation_importance(importances=importance_scores)
 
     elif args.validation_mode == "loso":
         if args.all_csv is None:

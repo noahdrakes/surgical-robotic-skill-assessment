@@ -89,7 +89,7 @@ def evaluate(model, loader, criterion, device, return_preds=False):
 # Training wrapper
 # ---------------------------
 
-def run_training(train_ds, val_ds, args, device, outpath):
+def run_training(train_ds, val_ds, args, device, outpath, return_history=False):
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers)
     val_loader   = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False,
@@ -107,15 +107,25 @@ def run_training(train_ds, val_ds, args, device, outpath):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.1, patience=5
     )
+    prev_lr = optimizer.param_groups[0]["lr"]
 
     best_val_loss = float("inf")
     best_epoch = -1
     ckpt_path = outpath
 
+    train_losses = []
+    val_losses = []
     for epoch in range(1, args.epochs + 1):
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc     = evaluate(model, val_loader, criterion, device)
         scheduler.step(val_loss)
+        new_lr = optimizer.param_groups[0]["lr"]
+        if new_lr < prev_lr:
+            wd = optimizer.param_groups[0].get("weight_decay", 0.0)
+            print(f"Epoch {epoch:03d} | lr decayed to {new_lr:.2e} | weight_decay: {wd:.2e}")
+        prev_lr = new_lr
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
 
         # print(
         #     f"Epoch {epoch:03d} | "
@@ -137,6 +147,9 @@ def run_training(train_ds, val_ds, args, device, outpath):
             }, ckpt_path)
 
     print(f"Best epoch: {best_epoch} | best_val_loss: {best_val_loss:.4f}\nSaved: {ckpt_path}")
+    if return_history:
+        history = {"train_loss": train_losses, "val_loss": val_losses}
+        return best_val_loss, val_acc, history
     return best_val_loss, val_acc
 
 
@@ -186,4 +199,17 @@ def plot_permutation_importance(importances, title="Permutation Importance (Δ A
     plt.title(title)
     plt.tight_layout()
     plt.savefig("permutation_importance.png", dpi=300, bbox_inches="tight")
+    plt.close()
+
+
+def plot_loss_curves(train_losses, val_losses, outpath, title="Training vs Validation Loss"):
+    plt.figure(figsize=(8, 5))
+    plt.plot(train_losses, label="train")
+    plt.plot(val_losses, label="val")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=300, bbox_inches="tight")
     plt.close()

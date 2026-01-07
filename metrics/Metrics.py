@@ -178,7 +178,6 @@ class Metrics:
         return a_total / completion_time
 
     def compute_average_jerk_magnitude(self, dfs, config):
-        
 
         if config["using_accel"]:
             trial_data = list(dfs.values())[1]
