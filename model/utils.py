@@ -110,7 +110,11 @@ def run_training(train_ds, val_ds, args, device, outpath, return_history=False):
     prev_lr = optimizer.param_groups[0]["lr"]
 
     best_val_loss = float("inf")
+    best_val_acc = 0.0
     best_epoch = -1
+    no_improve_epochs = 0
+    early_stop_patience = getattr(args, "early_stop_patience", 0)
+    early_stop_min_delta = getattr(args, "early_stop_min_delta", 0.0)
     ckpt_path = outpath
 
     train_losses = []
@@ -134,23 +138,28 @@ def run_training(train_ds, val_ds, args, device, outpath, return_history=False):
         #     f"lr: {optimizer.param_groups[0]['lr']:.2e}"
         # )
 
-        if val_loss < best_val_loss:
+        if val_loss < (best_val_loss - early_stop_min_delta):
             best_val_loss = val_loss
+            best_val_acc = val_acc
             best_epoch = epoch
-            torch.save({
-                "epoch": epoch,
-                "model_state": model.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-                "meta": {"n_features": train_ds.n_features,
-                         "n_classes": train_ds.n_classes},
-                "args": vars(args),
-            }, ckpt_path)
+            no_improve_epochs = 0
+            torch.save({"epoch": epoch,"model_state": model.state_dict(),"optimizer_state": optimizer.state_dict(),"meta": {"n_features": train_ds.n_features,
+                         "n_classes": train_ds.n_classes},"args": vars(args),}, ckpt_path)
+        else:
+            no_improve_epochs += 1
+
+        if early_stop_patience and no_improve_epochs >= early_stop_patience:
+            print(
+                f"Early stopping at epoch {epoch:03d} "
+                f"(no improvement in val_loss for {early_stop_patience} epochs)."
+            )
+            break
 
     print(f"Best epoch: {best_epoch} | best_val_loss: {best_val_loss:.4f}\nSaved: {ckpt_path}")
     if return_history:
         history = {"train_loss": train_losses, "val_loss": val_losses}
-        return best_val_loss, val_acc, history
-    return best_val_loss, val_acc
+        return best_val_loss, best_val_acc, history
+    return best_val_loss, best_val_acc
 
 
 

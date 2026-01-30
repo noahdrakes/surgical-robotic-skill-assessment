@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class metricsMLP(nn.Module):
-    def __init__(self, input_dim=18, hidden1=128, hidden2=128, num_classes=3, dropout=0.4):
+    def __init__(self, input_dim=18, hidden1=64, hidden2=64, num_classes=3, dropout=0):
         super(metricsMLP, self).__init__()
         self.layers = nn.Sequential(
             nn.Linear(input_dim, hidden1),

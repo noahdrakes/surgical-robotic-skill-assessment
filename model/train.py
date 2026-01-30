@@ -34,8 +34,8 @@ def main():
     # Choose feature subset
     # FEATURES = feats.ALL_FEATURESßß
     # FEATURES = feats.ALL_FEATURES_NO_FORCEN
-    # FEATURES = feats.KINEMATICS
-    FEATURES = feats.ALL_FEATURES
+    FEATURES = feats.KINEMATICS
+    # FEATURES = feats.ALL_FEATURES
     # Example: mix kinematics + selected kinetics
     # FEATURES = feats.KINEMATICS + feats.KINETICS[8:12]
     # FEATURES = feats.KINETICS
@@ -50,6 +50,10 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--weight_decay", type=float, default=1e-6)
     parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--early_stop_patience", type=int, default=0,
+                        help="Stop if val_loss doesn't improve for this many epochs (0 disables).")
+    parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
+                        help="Minimum val_loss decrease to count as improvement.")
 
     # Misc
     parser.add_argument("--seed", type=int, default=43)
