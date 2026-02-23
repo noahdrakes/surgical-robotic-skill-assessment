@@ -4,7 +4,8 @@
     Expected CSV input columns: "object" and "video_url".
     Uses ${object} in the instructions and ${video_url} in a video tag.
 
-    CSV output will include Input.object, Input.video_url, and Answer.answer.
+    CSV output will include Input.object, Input.video_url, and one Answer.<field>
+    entry for each GEARS domain.
 -->
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
@@ -24,7 +25,8 @@ $(document).ready(function() {
       'depth_perception',
       'bimanual_dexterity',
       'efficiency',
-      'force_sensitivity',
+      'force_control',
+      'autonomy',
       'robotic_control'
     ];
     var missing = requiredFields.some(function(field) {
@@ -41,64 +43,114 @@ $(document).ready(function() {
 </script>
 
 <div class="container mt-2">
-  <h4>Rate the performance shown in ${object} using the GEARS categories.</h4>
+  <h4>GEARS Rating: Intracorporeal Suturing Performance</h4>
+  <p class="mb-2">
+    You are rating a de-identified dVRK intracorporeal suturing trial on a silicone phantom. This dataset includes 23 participants
+    (novice residents, intermediate educators, and expert surgeons with more than 50 robotic cases), with six repetitions per subject.
+  </p>
+  <p class="mb-2">
+    Rate only what is visible in this video. Use the full 1-5 GEARS scale and anchor your score to the reference text under each domain.
+    If performance is between anchors, choose the nearest score. Do not infer skill from participant identity or cohort labels.
+  </p>
+  <p class="mb-2 text-muted">
+    Protocol context: Johns Hopkins Medicine IRB-approved study (#IRB00205668) with informed consent.
+  </p>
+  <p class="mb-3"><strong>Video ID:</strong> ${object}</p>
   <div id="form-error" class="alert alert-danger" style="display:none;"></div>
   <div class="row">
-    <div class="col-8">
-      <video src="${video_url}" class="w-100" controls></video>
-    </div>
-    <div class="col-4">
+    <div class="col-12">
+      <video src="${video_url}" class="w-100 mb-4" controls></video>
       <h5>Select a rating (1-5) for each category</h5>
-      <div class="form-group">
+      <div class="form-group w-100">
         <div class="mb-2"><strong>Depth Perception</strong></div>
-        <div class="btn-group btn-group-sm mb-3">
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
           <button class="btn btn-secondary option" data-field="depth_perception" data-value="1">1</button>
           <button class="btn btn-secondary option" data-field="depth_perception" data-value="2">2</button>
           <button class="btn btn-secondary option" data-field="depth_perception" data-value="3">3</button>
           <button class="btn btn-secondary option" data-field="depth_perception" data-value="4">4</button>
           <button class="btn btn-secondary option" data-field="depth_perception" data-value="5">5</button>
         </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Consistently exceeds target, large movements, slow correction.<br>
+          <strong>3:</strong> Some failures in reaching goal, but corrected quickly.<br>
+          <strong>5:</strong> Directs instruments in correct plane to the target.
+        </div>
 
         <div class="mb-2"><strong>Bimanual Dexterity</strong></div>
-        <div class="btn-group btn-group-sm mb-3">
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
           <button class="btn btn-secondary option" data-field="bimanual_dexterity" data-value="1">1</button>
           <button class="btn btn-secondary option" data-field="bimanual_dexterity" data-value="2">2</button>
           <button class="btn btn-secondary option" data-field="bimanual_dexterity" data-value="3">3</button>
           <button class="btn btn-secondary option" data-field="bimanual_dexterity" data-value="4">4</button>
           <button class="btn btn-secondary option" data-field="bimanual_dexterity" data-value="5">5</button>
         </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Uses one hand, ignores non-dominant hand, poor coordination.<br>
+          <strong>3:</strong> Uses both hands, but interaction is not optimal.<br>
+          <strong>5:</strong> Uses both hands in a complementary way for optimal exposure.
+        </div>
 
         <div class="mb-2"><strong>Efficiency</strong></div>
-        <div class="btn-group btn-group-sm mb-3">
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
           <button class="btn btn-secondary option" data-field="efficiency" data-value="1">1</button>
           <button class="btn btn-secondary option" data-field="efficiency" data-value="2">2</button>
           <button class="btn btn-secondary option" data-field="efficiency" data-value="3">3</button>
           <button class="btn btn-secondary option" data-field="efficiency" data-value="4">4</button>
           <button class="btn btn-secondary option" data-field="efficiency" data-value="5">5</button>
         </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Many tentative movements, frequent changes, no progress.<br>
+          <strong>3:</strong> Slow movements, but organized and reasonable.<br>
+          <strong>5:</strong> Confident and efficient, remains focused on goal.
+        </div>
 
-        <div class="mb-2"><strong>Force Sensitivity</strong></div>
-        <div class="btn-group btn-group-sm mb-3">
-          <button class="btn btn-secondary option" data-field="force_sensitivity" data-value="1">1</button>
-          <button class="btn btn-secondary option" data-field="force_sensitivity" data-value="2">2</button>
-          <button class="btn btn-secondary option" data-field="force_sensitivity" data-value="3">3</button>
-          <button class="btn btn-secondary option" data-field="force_sensitivity" data-value="4">4</button>
-          <button class="btn btn-secondary option" data-field="force_sensitivity" data-value="5">5</button>
+        <div class="mb-2"><strong>Force Control</strong></div>
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
+          <button class="btn btn-secondary option" data-field="force_control" data-value="1">1</button>
+          <button class="btn btn-secondary option" data-field="force_control" data-value="2">2</button>
+          <button class="btn btn-secondary option" data-field="force_control" data-value="3">3</button>
+          <button class="btn btn-secondary option" data-field="force_control" data-value="4">4</button>
+          <button class="btn btn-secondary option" data-field="force_control" data-value="5">5</button>
+        </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Jerking/tearing tissue, damage to structures, frequent suture breakage.<br>
+          <strong>3:</strong> Reasonable tissue handling, less damage, occasional suture rupture.<br>
+          <strong>5:</strong> Proper tissue handling/traction without breaking suture.
+        </div>
+
+        <div class="mb-2"><strong>Autonomy</strong></div>
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
+          <button class="btn btn-secondary option" data-field="autonomy" data-value="1">1</button>
+          <button class="btn btn-secondary option" data-field="autonomy" data-value="2">2</button>
+          <button class="btn btn-secondary option" data-field="autonomy" data-value="3">3</button>
+          <button class="btn btn-secondary option" data-field="autonomy" data-value="4">4</button>
+          <button class="btn btn-secondary option" data-field="autonomy" data-value="5">5</button>
+        </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Unable to complete the procedure.<br>
+          <strong>3:</strong> Completes task safely with some guidance.<br>
+          <strong>5:</strong> Completes task independently without guidance.
         </div>
 
         <div class="mb-2"><strong>Robotic Control</strong></div>
-        <div class="btn-group btn-group-sm mb-3">
+        <div class="btn-group btn-group-sm mb-3 d-flex" role="group">
           <button class="btn btn-secondary option" data-field="robotic_control" data-value="1">1</button>
           <button class="btn btn-secondary option" data-field="robotic_control" data-value="2">2</button>
           <button class="btn btn-secondary option" data-field="robotic_control" data-value="3">3</button>
           <button class="btn btn-secondary option" data-field="robotic_control" data-value="4">4</button>
           <button class="btn btn-secondary option" data-field="robotic_control" data-value="5">5</button>
         </div>
+        <div class="small text-muted mb-3">
+          <strong>1:</strong> Poor console hand positioning, frequent collision, suboptimal vision.<br>
+          <strong>3:</strong> Occasional hand collision, vision sometimes not optimal.<br>
+          <strong>5:</strong> Adequate camera control and optimal hand position without collision.
+        </div>
       </div>
       <input type="hidden" name="depth_perception">
       <input type="hidden" name="bimanual_dexterity">
       <input type="hidden" name="efficiency">
-      <input type="hidden" name="force_sensitivity">
+      <input type="hidden" name="force_control">
+      <input type="hidden" name="autonomy">
       <input type="hidden" name="robotic_control">
       <div class="form-group">
         <input type="submit" class="btn btn-primary" value="Submit">

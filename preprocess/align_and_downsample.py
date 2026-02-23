@@ -317,7 +317,8 @@ def get_crop_times(subject_id: str, trial_id: str, crop_df):
 # --- Main script execution ---
 
 # Load crop times from CSV and set multi-index for lookup
-CROPPED_TIMES_PATH = os.path.join(os.path.dirname(__file__), "croppedTimes.csv")
+# CROPPED_TIMES_PATH = os.path.join(os.path.dirname(__file__), "croppedTimes.csv")
+CROPPED_TIMES_PATH = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/meta/croppedTimes.csv"
 crop_df = pd.read_csv(CROPPED_TIMES_PATH, header=None, names=["subject", "trial", "start_time", "end_time"])
 crop_df.set_index(["subject", "trial"], inplace=True)
 
@@ -349,8 +350,8 @@ for subject_dir in subject_dirs:
 
     for trial_count, trial_dir in enumerate(trial_dirs):
 
-        valid_trials_csv = "/Users/noahdrakes/Documents/research/skill_assessment/MISTIC_robotic_suturing_study/protocol/trial_inclusion_matrix.csv"
-        valid_trials_no_broken_instruments = "/Users/noahdrakes/Documents/research/skill_assessment/MISTIC_robotic_suturing_study/protocol/trial_inclusion_matrix_no_faulty_instrument.csv"
+        valid_trials_csv = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/meta/trial_inclusion_matrix.csv"
+        valid_trials_no_broken_instruments = "/Users/noahdrakes/Documents/research/skill_assessment/surgical-robotic-skill-assessment/meta/trial_inclusion_matrix_no_faulty_instrument.csv"
 
         if is_trial_valid(valid_trials_no_broken_instruments, subject_dir, trial_dir) != True:
             print("SKIPPING INVALID TRIAL")
