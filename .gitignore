@@ -11,3 +11,4 @@ preprocess/__pycache__
 *checkpoints
 *.png
 *.csv
+results/

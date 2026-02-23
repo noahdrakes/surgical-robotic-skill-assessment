@@ -366,12 +366,8 @@ class Metrics:
     
     def compute_average_angular_speed_magnitude(self, dfs, config):
         trial_data = list(dfs.values())[0]
-        # compute speed magnitude at each timestep
-        speed_sq = np.zeros(len(trial_data))
-        for field in config["fields"]:
-            speed_sq += trial_data[field] ** 2
-        speed_magnitude = np.sqrt(speed_sq)
-        return float(speed_magnitude.mean())
+        angular_speed_magnitude = self.__compute_magnitude(trial_data, config, "fields")
+        return float(angular_speed_magnitude.mean())
 
     def compute_speed_correlation(self, dfs, config):
         PSMa_speed, PSMb_speed = list(dfs.values())

@@ -183,3 +183,56 @@ ALL_FEATURES_NO_FORCEN = KINEMATICS + KINETICS
 
 print(KINEMATICS)
 print(ALL_FEATURES_NO_FORCEN)
+
+ANOVA_FEATURES_16 = [
+    "PSM1_speed_effort_nT",
+    "PSM1_average_speed_magnitude",
+    "PSM2_average_speed_magnitude",
+    "PSM2_speed_effort_nT",
+    "PSM2_jerk_effort_nPL",
+    "PSM1_jerk_effort_nT",
+    "PSM1_average_jerk_magnitude",
+    "PSM1_jerk_effort_nPL",
+    "PSM1_average_angular_speed_magnitude",
+    "PSM2_average_jerk_magnitude",
+    "PSM2_jerk_effort_nT",
+    "PSM1_PSM2_acceleration_cross",
+    "ATIForceSensor_min_force_magnitude",
+    "completion_time",
+    "PSM1_acceleration_effort_nPL",
+    "PSM2_acceleration_effort_nPL",
+]
+
+PERM_IMPORTANCE_FEATURES_16 = [
+    "PSM1_speed_effort_nT",
+    "PSM1_average_speed_magnitude",
+    "PSM2_average_speed_magnitude",
+    "PSM1_speed_effort_nPL",
+    "PSM2_speed_effort_nT",
+    "PSM2_jerk_effort_nPL",
+    "PSM1_jerk_effort_nT",
+    "ATIForceSensor_average_force_magnitude_nT",
+    "PSM1_average_jerk_magnitude",
+    "PSM1_jerk_effort_nPL",
+    "PSM1_average_angular_speed_magnitude",
+    "PSM2_average_angular_speed_magnitude",
+    "PSM1_PSM2_speed_correlation",
+    "PSM2_average_jerk_magnitude",
+    "PSM2_jerk_effort_nT",
+    "PSM1_PSM2_acceleration_dispertion",
+]
+
+PERM_IMPORTANCE_FEATURES_8 = [
+    "PSM1_speed_effort_nT",
+    "PSM1_average_speed_magnitude",
+    "PSM2_average_speed_magnitude",
+    "PSM1_speed_effort_nPL",
+    "PSM2_speed_effort_nT",
+    "PSM2_jerk_effort_nPL",
+    "PSM1_jerk_effort_nT",
+    "ATIForceSensor_average_force_magnitude_nT",
+]
+
+
+
+
